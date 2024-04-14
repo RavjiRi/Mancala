@@ -1,8 +1,7 @@
 from math import pi, sin, cos
 import copy
 from panda3d.core import loadPrcFileData, Material, DirectionalLight
-loadPrcFileData("", "load-file-type p3assimp")
-
+loadPrcFileData("", "load-file-type p3assimp") # load objs
 from direct.showbase.ShowBase import ShowBase
 
 from direct.task import Task
@@ -16,6 +15,24 @@ from panda3d.core import *
 from panda3d.physics import *
 
 
+BitMasks = {
+        '0': {
+            '0': BitMask32(0x1), # 0000 0000 0000 0000 0000 0000 0000 0001
+            '1': BitMask32(0x2), # 0000 ... 0010
+            '2': BitMask32(0x4), # 0000 ... 0100
+            '3': BitMask32(0x8),
+            '4': BitMask32(0x10),
+            '5': BitMask32(0x20)
+            },
+        '1': {
+            '0': BitMask32(0x40), # 0000 0000 0000 0000 0000 0000 0100 0000
+            '1': BitMask32(0x80), # 0000 ... 1000 0000
+            '2': BitMask32(0x100), # 0000 ... 0001 0000 0000
+            '3': BitMask32(0x200),
+            '4': BitMask32(0x400),
+            '5': BitMask32(0x800)
+            }
+    }
 
 class MyApp(ShowBase):
 
@@ -24,14 +41,23 @@ class MyApp(ShowBase):
         self.disableMouse() # Disable the camera trackball controls.
         base.setFrameRateMeter(True)
         self.set_background_color(1, 1, 1, 1)
-
+        
         ''' camera '''
         self.camera.setPos(30, 0, 40) # z axis is the y axis that I am used to
         self.camera.lookAt(0,0,0)
         self.camLens.setFov(50) # default FOV is 40
 
+        # start physics
+        self.enableParticles()
+        # physics handler
+        self.pusher=PhysicsCollisionHandler()#CollisionHandlerPusher()
+        self.pusher.setDynamicFrictionCoef(0.5) # add friction
+        self.pusher.setStaticFrictionCoef(0)
+        traverser = CollisionTraverser('physics')
+        self.cTrav = traverser # automatically handle physics operations
+        #traverser.showCollisions(self.render) # DEBUG
+        
         # self.workspace = NodePath("workspace")
-
         ''' directional light '''
         # directional light for the mancala board as it does not show up without it...
         light = DirectionalLight("alight")
@@ -55,19 +81,83 @@ class MyApp(ShowBase):
         self.board.setP(self.board, 90) # rotate because I made the model wrong...
         self.board.setR(self.board, 10)
         self.board.reparentTo(self.render)
+        #self.board.hide()
         #self.board.reparentTo(self.workspace)
         #self.workspace.reparentTo(self.render)
-
+    
+        ''' untitled model '''
+        #self.collision_board = self.loader.loadModel("mancala/untitled.obj", noCache=True)
+        #self.collision_board.setP(self.collision_board, 90) # rotate because I made the model wrong...
+        #self.collision_board.reparentTo(self.render)
+        y_pos_click = [9.8, 5.8, 1.9, -1.9, -5.8, -9.8]
+        self.clickable_points = {}
+        ''' loop through board parts '''
+        for side in range(2):
+            self.clickable_points[side] = {}
+            # clickable obj nth from left
+            for n in range(6):
+                ''' create board collisions '''
+                self.segment = self.loader.loadModel("mancala/CollisionAssets/{}-{}.obj".format(side, n+1))
+                self.segment.setP(self.segment, 90)
+                self.segment.reparentTo(self.render)
+                self.segment.hide()
+                for model in self.segment.find_all_matches("**/+GeomNode"):
+                    model.setCollideMask(BitMasks[str(side)][str(n)])
+                ''' create clickable points '''
+                clickable = self.loader.loadModel('models/misc/sphere')
+                y_pos = y_pos_click[n]
+                # x value: turn 0 -> -1, 1 -> 1, then *2
+                clickable.setPos(2*(2*side-1), y_pos, 1)
+                clickable.setScale(1.5, 1.5, 1.5)
+                clickable.reparentTo(self.render)
+                clickable.name='clickable ' + str(side) + "-" + str(n) # change name
+                clickable.setTag('click', str(side)+"-"+str(n))
+                clickable.hide() # make invisible
+                self.clickable_points[side][n] = clickable
+                ''' stones '''
+                for count in range(4):
+                    x, y, z = clickable.getPos()
+                    self.stone = self.loader.loadModel('models/misc/sphere')
+                    self.stone.subdivideCollisions(4)
+                    self.stone.setPos(x, y, 5+count*5)
+                    self.stone.setScale(0.35, 0.35, 0.35)
+                    self.stone.setColor(0, 1, 0, 0)
+                    if side == 0:
+                        self.stone.setColor(0, 0, 1, 0)
+                    self.stone.reparentTo(self.render)
+                    # start physics logic
+                    node = NodePath("PhysicsNode")
+                    node.reparentTo(self.render)
+                    an = ActorNode("stone-physics")
+                    Panp=node.attachNewNode(an)
+                    self.physicsMgr.attachPhysicalNode(an)
+                    self.stone.reparentTo(Panp)
+                    # create a collision sphere which will set how the stone looks to the collision system
+                    cs = CollisionSphere(self.stone.getBounds().getCenter(), 0.35)
+                    cn = CollisionNode('cnode')
+                    cn.setFromCollideMask(BitMasks[str(side)][str(n)])
+                    cn.setIntoCollideMask(BitMasks[str(side)][str(n)])
+                    cnodePath = Panp.attachNewNode(cn)
+                    ###cnodePath.setCollideMask(BitMask32(0x10+count))
+                    #cnodePath = Panp.attachNewNode(CollisionNode('cnode'))
+                    cnodePath.node().addSolid(cs)
+                    self.pusher.addCollider(cnodePath, Panp)
+                    traverser.addCollider(cnodePath, self.pusher)
+                    # cnodePath.show() # DEBUG
+            y_pos_click = list(reversed(y_pos_click))
+                
 
         ''' create clickable points '''
+        '''
         # the y positions of the invisible clickable objects (looks like x pos changed from viewpoint)
         y_pos_click = [-9.8, -5.8, -1.9, 1.9, 5.8, 9.8]
+        y_pos_click = list(reversed(y_pos_click))
         self.clickable_points = {}
         for side in range(2):
             self.clickable_points[side] = {}
             for n, y_pos in enumerate(y_pos_click):
                 # index, value for loop
-                ''' clickable obj nth from left'''
+                # clickable obj nth from left
                 clickable = self.loader.loadModel('models/misc/sphere')
                 # x value: turn 0 -> -1, 1 -> 1, then *2
                 clickable.setPos(2*(2*side-1), y_pos, 1)
@@ -77,26 +167,26 @@ class MyApp(ShowBase):
                 clickable.setTag('click', str(side)+"-"+str(n))
                 clickable.hide() # make invisible
                 self.clickable_points[side][n] = clickable
-
-        # start physics
-        self.enableParticles()
-        # physics handler
-        self.pusher=PhysicsCollisionHandler()#CollisionHandlerPusher()
-        self.pusher.setDynamicFrictionCoef(0.5) # add friction
-        self.pusher.setStaticFrictionCoef(1)
-        traverser = CollisionTraverser('physics')
-        self.cTrav = traverser # automatically handle physics operations
-        #traverser.showCollisions(self.render) # DEBUG
-        # GET RID OF RED DEBUG COLLISIONS
+            y_pos_click = list(reversed(y_pos_click))
+        '''
+        
+        '''
+        FROM objects are the 'moving' objs
+        INTO objects are the non moving 'walls'
+        '''
         ''' create stones '''
-        for side in self.clickable_points.values():
-            for point in side.values():
-                for count in range(1):
+        '''
+        for k, side in self.clickable_points.items():
+            for k2, point in side.items():
+                for count in range(4):
                     x, y, z = point.getPos()
                     self.stone = self.loader.loadModel('models/misc/sphere')
+                    self.stone.subdivideCollisions(4)
                     self.stone.setPos(x, y, 5+count*5)
                     self.stone.setScale(0.5, 0.5, 0.5)
                     self.stone.setColor(0, 1, 0, 0)
+                    if k == 0:
+                        self.stone.setColor(0, 0, 1, 0)
                     self.stone.reparentTo(self.render)
                     # start physics logic
                     node = NodePath("PhysicsNode")
@@ -107,11 +197,17 @@ class MyApp(ShowBase):
                     self.stone.reparentTo(Panp)
                     # create a collision sphere which will set how the stone looks to the collision system
                     cs = CollisionSphere(self.stone.getBounds().getCenter(), 0.5)
-                    cnodePath = Panp.attachNewNode(CollisionNode('cnode'))
+                    cn = CollisionNode('cnode')
+                    cn.setFromCollideMask(BitMasks[str(k)][str(k2)])
+                    cn.setIntoCollideMask(BitMasks[str(k)][str(k2)])
+                    cnodePath = Panp.attachNewNode(cn)
+                    ###cnodePath.setCollideMask(BitMask32(0x10+count))
+                    #cnodePath = Panp.attachNewNode(CollisionNode('cnode'))
                     cnodePath.node().addSolid(cs)
                     self.pusher.addCollider(cnodePath, Panp)
                     traverser.addCollider(cnodePath, self.pusher)
                     # cnodePath.show() # DEBUG
+        '''
         '''
         self.bean = self.loader.loadModel('models/misc/sphere')
         self.bean.setPos(2, 2, 5)
@@ -130,7 +226,14 @@ class MyApp(ShowBase):
         #self.pusher=PhysicsCollisionHandler()#CollisionHandlerPusher()
         #self.pusher.setDynamicFrictionCoef(1) # add friction
         # the new copy
-        board_copy = self.addCollider_from_collision_mesh_from_model(self.board, self.pusher)
+
+        '''
+        for model in self.collision_board.find_all_matches("**/+GeomNode"):
+            model.setCollideMask(BitMask32(0x11))
+        '''
+            
+            #node.node().setIntoCollideMask(BitMask32(2))
+        #####board_copy = self.addCollider_from_collision_mesh_from_model(self.board, self.pusher)
         
         ''''''
         #traverser = CollisionTraverser('physics')
@@ -238,7 +341,6 @@ class MyApp(ShowBase):
 
         self.pandaPace.loop()
 
-
     # Define a procedure to move the camera.
 
     def spinCameraTask(self, task):
@@ -262,7 +364,6 @@ class MyApp(ShowBase):
         model_copy.flatten_light()
         collision_root = NodePath("collision_root")
         collision_root.reparent_to(loaded_model)
-
         for model in model_copy.find_all_matches("**/+GeomNode"):
             model_node = model.node()
             collision_node = CollisionNode(model_node.name)
@@ -283,8 +384,8 @@ class MyApp(ShowBase):
                     points = [Point3(*view[index*3:index*3+3]) for index in indices]
                     coll_poly = CollisionPolygon(*points)
                     collision_node.add_solid(coll_poly)
-            anp = model_copy.attachNewNode(ActorNode('actor'))
-            collision_handler.addCollider(collision_mesh, anp)
+            #anp = model_copy.attachNewNode(ActorNode('actor'))
+            #collision_handler.addCollider(collision_mesh, anp)
         return model_copy
 
     def enableGravity(self):
