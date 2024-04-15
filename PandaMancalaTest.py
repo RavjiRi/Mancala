@@ -3,7 +3,7 @@ import copy
 from panda3d.core import loadPrcFileData, Material, DirectionalLight
 loadPrcFileData("", "load-file-type p3assimp") # load objs
 from direct.showbase.ShowBase import ShowBase
-
+from direct.gui.DirectGui import *
 from direct.task import Task
 
 from direct.actor.Actor import Actor
@@ -13,24 +13,27 @@ from direct.interval.IntervalGlobal import Sequence
 from panda3d.core import PointLight, AmbientLight, NodePath, Point3
 from panda3d.core import *
 from panda3d.physics import *
+from time import sleep
 
 
 BitMasks = {
-        '0': {
-            '0': BitMask32(0x1), # 0000 0000 0000 0000 0000 0000 0000 0001
-            '1': BitMask32(0x2), # 0000 ... 0010
-            '2': BitMask32(0x4), # 0000 ... 0100
-            '3': BitMask32(0x8),
-            '4': BitMask32(0x10),
-            '5': BitMask32(0x20)
+        0: {
+            0: BitMask32(0x1), # 0000 0000 0000 0000 0000 0000 0000 0001
+            1: BitMask32(0x2), # 0000 ... 0010
+            2: BitMask32(0x4), # 0000 ... 0100
+            3: BitMask32(0x8),
+            4: BitMask32(0x10),
+            5: BitMask32(0x20),
+            6: BitMask32(0x1000) # bit mask for plr 0 goal
             },
-        '1': {
-            '0': BitMask32(0x40), # 0000 0000 0000 0000 0000 0000 0100 0000
-            '1': BitMask32(0x80), # 0000 ... 1000 0000
-            '2': BitMask32(0x100), # 0000 ... 0001 0000 0000
-            '3': BitMask32(0x200),
-            '4': BitMask32(0x400),
-            '5': BitMask32(0x800)
+        1: {
+            0: BitMask32(0x40), # 0000 0000 0000 0000 0000 0000 0100 0000
+            1: BitMask32(0x80), # 0000 ... 1000 0000
+            2: BitMask32(0x100), # 0000 ... 0001 0000 0000
+            3: BitMask32(0x200),
+            4: BitMask32(0x400),
+            5: BitMask32(0x800),
+            6: BitMask32(0x2000) # bit mask for plr 1 goal
             }
     }
 
@@ -90,142 +93,97 @@ class MyApp(ShowBase):
         #self.collision_board.setP(self.collision_board, 90) # rotate because I made the model wrong...
         #self.collision_board.reparentTo(self.render)
         y_pos_click = [9.8, 5.8, 1.9, -1.9, -5.8, -9.8]
-        self.clickable_points = {}
+        x_pos_click = [-2, 2]
+        self.stones = {}
+        self.clickables = {}
         ''' loop through board parts '''
+        # two sides because of two players
         for side in range(2):
-            self.clickable_points[side] = {}
+            self.stones[side] = {}
+            self.clickables[side] = {}
             # clickable obj nth from left
             for n in range(6):
                 ''' create board collisions '''
-                self.segment = self.loader.loadModel("mancala/CollisionAssets/{}-{}.obj".format(side, n+1))
-                self.segment.setP(self.segment, 90)
-                self.segment.reparentTo(self.render)
-                self.segment.hide()
-                for model in self.segment.find_all_matches("**/+GeomNode"):
-                    model.setCollideMask(BitMasks[str(side)][str(n)])
+                segment = self.loader.loadModel("mancala/CollisionAssets/{}-{}.obj".format(side, n+1))
+                segment.setP(segment, 90)
+                segment.reparentTo(self.render)
+                segment.hide()
+                for model in segment.find_all_matches("**/+GeomNode"):
+                    model.setCollideMask(BitMasks[side][n])
                 ''' create clickable points '''
                 clickable = self.loader.loadModel('models/misc/sphere')
+                self.clickables[side][n] = clickable
                 y_pos = y_pos_click[n]
-                # x value: turn 0 -> -1, 1 -> 1, then *2
-                clickable.setPos(2*(2*side-1), y_pos, 1)
+                x_pos = x_pos_click[side]
+                clickable.setPos(x_pos, y_pos, 1)
                 clickable.setScale(1.5, 1.5, 1.5)
                 clickable.reparentTo(self.render)
                 clickable.name='clickable ' + str(side) + "-" + str(n) # change name
                 clickable.setTag('click', str(side)+"-"+str(n))
                 clickable.hide() # make invisible
-                self.clickable_points[side][n] = clickable
                 ''' stones '''
+                self.stones[side][n] = [] # store stones in dictionary
                 for count in range(4):
                     x, y, z = clickable.getPos()
-                    self.stone = self.loader.loadModel('models/misc/sphere')
-                    self.stone.subdivideCollisions(4)
-                    self.stone.setPos(x, y, 5+count*5)
-                    self.stone.setScale(0.35, 0.35, 0.35)
-                    self.stone.setColor(0, 1, 0, 0)
+                    stone = self.loader.loadModel('models/misc/sphere')
+                    self.stones[side][n].append(stone)
+                    # self.stone.subdivideCollisions(4)
+                    #stone.setPos(x, y, 5+count*5)
+                    stone.setScale(0.35, 0.35, 0.35)
+                    # side 0 has blue, side 1 has green
                     if side == 0:
-                        self.stone.setColor(0, 0, 1, 0)
-                    self.stone.reparentTo(self.render)
+                        stone.setColor(0, 0, 1, 0)
+                    elif side == 1:
+                        stone.setColor(0, 1, 0, 0)
                     # start physics logic
                     node = NodePath("PhysicsNode")
                     node.reparentTo(self.render)
                     an = ActorNode("stone-physics")
                     Panp=node.attachNewNode(an)
                     self.physicsMgr.attachPhysicalNode(an)
-                    self.stone.reparentTo(Panp)
+                    stone.reparentTo(Panp)
+
+                    # set stone position
+                    Panp.setPos(x, y, 5+count*5)
+                    
                     # create a collision sphere which will set how the stone looks to the collision system
-                    cs = CollisionSphere(self.stone.getBounds().getCenter(), 0.35)
+                    cs = CollisionSphere(stone.getBounds().getCenter(), 0.35)
                     cn = CollisionNode('cnode')
-                    cn.setFromCollideMask(BitMasks[str(side)][str(n)])
-                    cn.setIntoCollideMask(BitMasks[str(side)][str(n)])
+                    '''
+                    FROM objects are the 'moving' objs
+                    INTO objects are the non moving 'walls'
+                    '''
+                    cn.setFromCollideMask(BitMasks[side][n])
+                    cn.setIntoCollideMask(BitMasks[side][n])
                     cnodePath = Panp.attachNewNode(cn)
-                    ###cnodePath.setCollideMask(BitMask32(0x10+count))
-                    #cnodePath = Panp.attachNewNode(CollisionNode('cnode'))
                     cnodePath.node().addSolid(cs)
                     self.pusher.addCollider(cnodePath, Panp)
                     traverser.addCollider(cnodePath, self.pusher)
-                    # cnodePath.show() # DEBUG
+                    #cnodePath.show() # DEBUG
+            ''' board collisions for goal '''
+            segment = self.loader.loadModel("mancala/CollisionAssets/{}-{}.obj".format(side, 7))
+            segment.setP(segment, 90)
+            segment.reparentTo(self.render)
+            segment.hide()
+            for model in segment.find_all_matches("**/+GeomNode"):
+                model.setCollideMask(BitMasks[side][6])
+            self.stones[side][6] = [] # create the array to store stones in goal
+            ''' create clickable points '''
+            clickable = self.loader.loadModel('models/misc/sphere')
+            self.clickables[side][6] = clickable
+            if side == 0:
+                y_pos = -13.9
+            else:
+                y_pos = 13.9
+            x_pos = 0
+            clickable.setPos(x_pos, y_pos, 1)
+            clickable.setScale(1.5, 1.5, 1.5)
+            clickable.hide()
+            clickable.reparentTo(self.render)
+            # reverse list so the first stones load on the left
             y_pos_click = list(reversed(y_pos_click))
-                
 
-        ''' create clickable points '''
-        '''
-        # the y positions of the invisible clickable objects (looks like x pos changed from viewpoint)
-        y_pos_click = [-9.8, -5.8, -1.9, 1.9, 5.8, 9.8]
-        y_pos_click = list(reversed(y_pos_click))
-        self.clickable_points = {}
-        for side in range(2):
-            self.clickable_points[side] = {}
-            for n, y_pos in enumerate(y_pos_click):
-                # index, value for loop
-                # clickable obj nth from left
-                clickable = self.loader.loadModel('models/misc/sphere')
-                # x value: turn 0 -> -1, 1 -> 1, then *2
-                clickable.setPos(2*(2*side-1), y_pos, 1)
-                clickable.setScale(1.5, 1.5, 1.5)
-                clickable.reparentTo(self.render)
-                clickable.name='clickable ' + str(side) + "-" + str(n) # change name
-                clickable.setTag('click', str(side)+"-"+str(n))
-                clickable.hide() # make invisible
-                self.clickable_points[side][n] = clickable
-            y_pos_click = list(reversed(y_pos_click))
-        '''
-        
-        '''
-        FROM objects are the 'moving' objs
-        INTO objects are the non moving 'walls'
-        '''
-        ''' create stones '''
-        '''
-        for k, side in self.clickable_points.items():
-            for k2, point in side.items():
-                for count in range(4):
-                    x, y, z = point.getPos()
-                    self.stone = self.loader.loadModel('models/misc/sphere')
-                    self.stone.subdivideCollisions(4)
-                    self.stone.setPos(x, y, 5+count*5)
-                    self.stone.setScale(0.5, 0.5, 0.5)
-                    self.stone.setColor(0, 1, 0, 0)
-                    if k == 0:
-                        self.stone.setColor(0, 0, 1, 0)
-                    self.stone.reparentTo(self.render)
-                    # start physics logic
-                    node = NodePath("PhysicsNode")
-                    node.reparentTo(self.render)
-                    an = ActorNode("stone-physics")
-                    Panp=node.attachNewNode(an)
-                    self.physicsMgr.attachPhysicalNode(an)
-                    self.stone.reparentTo(Panp)
-                    # create a collision sphere which will set how the stone looks to the collision system
-                    cs = CollisionSphere(self.stone.getBounds().getCenter(), 0.5)
-                    cn = CollisionNode('cnode')
-                    cn.setFromCollideMask(BitMasks[str(k)][str(k2)])
-                    cn.setIntoCollideMask(BitMasks[str(k)][str(k2)])
-                    cnodePath = Panp.attachNewNode(cn)
-                    ###cnodePath.setCollideMask(BitMask32(0x10+count))
-                    #cnodePath = Panp.attachNewNode(CollisionNode('cnode'))
-                    cnodePath.node().addSolid(cs)
-                    self.pusher.addCollider(cnodePath, Panp)
-                    traverser.addCollider(cnodePath, self.pusher)
-                    # cnodePath.show() # DEBUG
-        '''
-        '''
-        self.bean = self.loader.loadModel('models/misc/sphere')
-        self.bean.setPos(2, 2, 5)
-        self.bean.setScale(0.5, 0.5, 0.5)
-        self.bean.setColor(0, 1, 0, 0)
-
-
-        node = NodePath("PhysicsNode")
-        node.reparentTo(self.render)
-        an = ActorNode("bean-physics")
-        Panp=node.attachNewNode(an)
-        self.physicsMgr.attachPhysicalNode(an)
-        self.bean.reparentTo(Panp)
-        '''
-        # physics handler
-        #self.pusher=PhysicsCollisionHandler()#CollisionHandlerPusher()
-        #self.pusher.setDynamicFrictionCoef(1) # add friction
-        # the new copy
+        ###self.taskMgr.add(self.applyForce, "forceTask")
 
         '''
         for model in self.collision_board.find_all_matches("**/+GeomNode"):
@@ -340,7 +298,7 @@ class MyApp(ShowBase):
                                   name="pandaPace")
 
         self.pandaPace.loop()
-
+        
     # Define a procedure to move the camera.
 
     def spinCameraTask(self, task):
@@ -387,7 +345,29 @@ class MyApp(ShowBase):
             #anp = model_copy.attachNewNode(ActorNode('actor'))
             #collision_handler.addCollider(collision_mesh, anp)
         return model_copy
+    def applyForce(self, task, stone, go_to: Vec3):
+        an=stone.getParent().node()
+        physical = an.getPhysical(0)
+        phyObj = an.getPhysicsObject()
+        thruster=stone.get_parent()
 
+        max_speed = 10
+        moveVec = (go_to-thruster.get_pos())
+        moveDir = moveVec.normalized()
+        moveDist = moveVec.length()
+        ratio = (2/(1+pow(2.7, -moveDist))-1) # sigmoid function
+        phyObj.setVelocity(moveDir*max_speed*ratio)
+        return Task.cont
+    def createStartButton(self, func):
+        # Add button
+        b = DirectButton(text="START",
+                         scale=.05, command=func, frameSize=(-2, 2, -1, 1))
+        return b
+    def setStationary(self, stone):
+        an=stone.getParent().node()
+        phyObj = an.getPhysicsObject()
+
+        phyObj.setVelocity(Vec3(0, 0, 0))
     def enableGravity(self):
         gravityFN = ForceNode('world-forces')
         gravityFNP = self.render.attachNewNode(gravityFN)
@@ -408,8 +388,96 @@ class MyApp(ShowBase):
             pickedObj = self.myHandler.getEntry(0).getIntoNodePath()
             print("clicked on:", pickedObj)
             print("net", pickedObj.findNetTag('click'))
+    def clickedOnClickable(self, func, q):
+        mpos = base.mouseWatcherNode.getMouse() # get mouse
+        # sets collsion ray to start at camera and extend to inf in mouse direction
+        self.pickerRay.setFromLens(base.camNode, mpos.getX(), mpos.getY())
 
+        self.myTraverser.traverse(self.render) # detect collisions
+        # Assume for simplicity's sake that myHandler is a CollisionHandlerQueue.
+        if self.myHandler.getNumEntries() > 0:
+            # This is so we get the closest object
+            self.myHandler.sortEntries()
+            pickedObj = self.myHandler.getEntry(0).getIntoNodePath()
+            pickedObj = pickedObj.findNetTag('click')
+            if not pickedObj.isEmpty():
+                # clicked on clickable
+                q.put(pickedObj)
+                func()
+            
+class MancalaUtils():
+    '''
+    functions which are not directly related to the main app class
+    which help make code smaller and more readable
+    '''
+    def next_pit(self, side, n):
+        n+=1
+        if n>=7:
+            n=0
+            if side == 0:
+                side = 1
+            else:
+                side = 0
+        return side, n
+    def get_side_from_name(self, clickable):
+        return int(clickable.name[-3:][0])
+    def get_n_from_name(self, clickable):
+        return int(clickable.name[-3:][-1])
 
-app = MyApp()
+#from time import sleep
+import threading, queue
+def main(app):
+    util = MancalaUtils()
+    event = threading.Event()
+    q = queue.Queue()
+    button = app.createStartButton(event.set)
+    event.wait() # wait for click
+    event.clear() # reset 'internal flag' (read threading docs)
+    button.hide()
+    while True:
+        app.accept('mouse1', app.clickedOnClickable, extraArgs=[event.set, q])
+        event.wait() # wait for click on clickable object
+        event.clear()
+        app.ignore('mouse1') # remove event listener
+        clickedObj = q.get()
 
-app.run()
+        # the side which the pit is selected
+        clicked_pit_side = util.get_side_from_name(clickedObj)
+        # the nth pit from the left that is selected
+        clicked_pit_n = util.get_n_from_name(clickedObj)
+        side = clicked_pit_side
+        n = clicked_pit_n
+        while app.stones[clicked_pit_side][clicked_pit_n] != []:
+            currentPit = app.clickables[side][n]
+            go_to = currentPit.getPos()+Vec3(0, 0, 5)
+            for stone in app.stones[clicked_pit_side][clicked_pit_n]:
+                # move above the current pit
+                task = app.taskMgr.add(app.applyForce, "forceTask", extraArgs=["forceTask", stone, go_to])
+            sleep(1)
+            app.taskMgr.removeTasksMatching("forceTask")
+            for stone in app.stones[clicked_pit_side][clicked_pit_n]:
+                app.setStationary(stone)
+
+            to_side, to_n = util.next_pit(side, n)
+            go_to = app.clickables[to_side][to_n].getPos()+Vec3(0, 0, 5)
+            for stone in app.stones[clicked_pit_side][clicked_pit_n]:
+                # move above the next pit
+                task = app.taskMgr.add(app.applyForce, "forceTask", extraArgs=["forceTask", stone, go_to])
+            sleep(1)
+            app.taskMgr.removeTasksMatching("forceTask")
+            for stone in app.stones[clicked_pit_side][clicked_pit_n]:
+                app.setStationary(stone)
+            droppedStone = app.stones[clicked_pit_side][clicked_pit_n].pop()
+            cn = droppedStone.getParent().find('cnode').node()
+            cn.setFromCollideMask(BitMasks[to_side][to_n])
+            cn.setIntoCollideMask(BitMasks[to_side][to_n])
+            app.stones[to_side][to_n].append(droppedStone)
+            side, n = to_side, to_n
+
+if __name__ == "__main__":
+    app = MyApp()
+    
+    x = threading.Thread(target=main, args=(app,))
+    x.start()
+    
+    app.run()
