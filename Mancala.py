@@ -1,3 +1,16 @@
+from time import sleep
+from random import randint
+from queue import Queue
+import threading # don't check for these libraries as these are core libraries
+import sys
+from pathlib import Path
+from os import _exit
+
+# in case of local installation of Panda3D
+working_directory = Path(__file__).parent.resolve()
+panda3d_install = working_directory/'Panda3D' # path of panda3d install
+sys.path.append(panda3d_install.as_posix())
+
 try:
     from direct.showbase.ShowBase import ShowBase
     from direct.gui.DirectGui import *
@@ -6,12 +19,6 @@ try:
     from panda3d.physics import *
 except ImportError:
     raise ImportError("Please import the panda3d library to run this program using pip or https://docs.panda3d.org/1.10/python/introduction/index")
-
-# don't check for these libraries as these are core libraries
-from time import sleep
-from random import randint
-from queue import Queue
-import threading
 
 loadPrcFileData("", "load-file-type p3assimp") # obj files can be loaded
 
@@ -24,6 +31,9 @@ class Mancala(ShowBase):
         properties = WindowProperties()
         properties.setTitle('Mancala')
         self.win.requestProperties(properties) # set window properties
+
+        self.win.setCloseRequestEvent('window_closed')
+        self.accept('window_closed', self.window_closed)
         
         self.enableParticles() # start physics
         self.pusher = PhysicsCollisionHandler() # handle physics collisions by automatically pushing colliding objects
@@ -78,21 +88,6 @@ class Mancala(ShowBase):
         self.mouseq = Queue()
         # run onMouseClick when mouse is clicked
         self.accept('mouse1', self.onMouseClick)
-    def alignPosition(self, task, stone, go_to: Vec3):
-        # gradually move stone to position, helpful position for controller code
-        an=stone.getParent().node() # actor node
-        # physical and physics object, look at panda3d docs for more
-        physical = an.getPhysical(0)
-        phyObj = an.getPhysicsObject()
-        thruster=stone.get_parent() # this should be a node path
-
-        max_speed = 10 # the max speed possible when moving the stone
-        moveVec = (go_to-thruster.get_pos()) # direction*size from current stone position to go_to
-        moveDir = moveVec.normalized() # direction
-        moveDist = moveVec.length() # size
-        ratio = (2/(1+pow(2.7, -moveDist))-1) # sigmoid function, to calculate the speed of the stone
-        phyObj.setVelocity(moveDir*max_speed*ratio)
-        return Task.cont # task finished (see panda3d task docs)
     def createStartButton(self, func):
         # add start button
         b = DirectButton(text="START",
@@ -110,6 +105,9 @@ class Mancala(ShowBase):
         gravityFN.addForce(gravityForce)
 
         self.physicsMgr.addLinearForce(gravityForce)
+    def window_closed(self):
+        self.destroy()
+        _exit(0) # fully restart (closes window on mac)
     def returnClickedPit(self):
         clickedPit = None
         while not clickedPit:
@@ -135,8 +133,8 @@ def main(app):
     event.wait() # wait for click
     event.clear() # reset 'internal flag' (read threading docs)
     button.hide()
-    while not controller.isGameComplete():
-        turn = controller.getTurn()
+    while not controller.is_game_complete():
+        turn = controller.get_turn()
         turnText.show()
         if turn == 0:
             turnText['text'] = "Your turn"
@@ -157,10 +155,10 @@ def main(app):
                     # keep generating a new pit until it has stones
                     hasStones = True
             
-        controller.clickedPit(clicked_side, clicked_n)
-    if controller.getWinner() == 0:
+        controller.clicked_pit(clicked_side, clicked_n)
+    if controller.get_winner() == 0:
         print("You win!")
-    elif controller.getWinner() == 1:
+    elif controller.get_winner() == 1:
         print("You lose...")
     else:
         print("You tie")
