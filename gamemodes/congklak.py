@@ -74,9 +74,9 @@ class Classic():
         self.stones = {}  # dictionary to store stones
         self.clickables = {}  # dictionary to store clickables
         self.hoverables = {}  # dictionary to store hoverables
-        self.stonesPerPit = 4
+        self.stonesPerPit = 1#7
         # path to classic assets folder
-        self.classic_assets = Path(__file__).parent.resolve()/'classic_assets'
+        self.classic_assets = Path(__file__).parent.resolve()/'congklak_assets'
 
     def load(self):
         """Load the board on to the scene (render)."""
@@ -232,8 +232,8 @@ class Classic():
 
         side = clicked_side
         n = clicked_n
-        # while clicked_stones is NOT empty
-        while clicked_stones:
+        # repeat for the # of stones in the clicked pit
+        for i in range(0, len(clicked_stones)):
             current_pit = self.hoverables[side][n]
             go_to = current_pit.getPos()+Vec3(0, 0, 5)
             for stone in clicked_stones:
@@ -274,6 +274,55 @@ class Classic():
             self.stones[side][n].append(dropped_stone)  # add to new pit
             # just incase, stop the stone from moving
             self.set_stationary(dropped_stone)
+        # end of 'sowing' stones
+
+        if n != 6:
+            # last stone was dropped and not dropped in the mancala (seed store)
+            if len(self.stones[side][n]) > 1:
+                # as per the rules
+                # the last stone lands in a pit with stones (so #stones > 1)
+                # pickup and continue
+                self.clicked_pit(side, n)
+                # once function is finished exit or the turns will mess up
+                # this is because the self.clicked_pit will already switch the turns
+                return
+            elif len(self.stones[side][n]) == 1 and side == self.turn:
+                # as per the rules
+                # the pit was originally without stones and on the players side
+                # so collect adjacent stones into the players mancala
+                adj_side, adj_n = self.adj_pit(side, n)
+                clicked_stones = self.stones[adj_side][adj_n]
+                go_to = self.hoverables[self.turn][6].getPos()+Vec3(0, 0, 5)
+
+                for stone in clicked_stones+self.stones[side][n][0:1]:
+                    # move above the next pit
+                    app.taskMgr.add(
+                        self.align_position, "moveTask",
+                        extraArgs=["moveTask", stone, go_to]
+                        )
+                sleep(4.5)
+                app.taskMgr.removeTasksMatching("moveTask")
+
+                for dropped_stone in clicked_stones:
+                    cn = dropped_stone.getParent().find('cnode').node()  # collision node
+                    # set the collide masks to the collide mask of the new pit
+                    cn.setFromCollideMask(BitMasks[side][n])
+                    cn.setIntoCollideMask(BitMasks[side][n])
+                    self.stones[self.turn][6].append(dropped_stone)  # add to new pit
+                    # just incase, stop the stone from moving
+                    self.set_stationary(dropped_stone)
+                clicked_stones.clear()  # empty the array
+
+                dropped_stone = self.stones[side][n].pop() # remove and get value
+                cn = dropped_stone.getParent().find('cnode').node()  # collision node
+                # set the collide masks to the collide mask of the new pit
+                cn.setFromCollideMask(BitMasks[side][n])
+                cn.setIntoCollideMask(BitMasks[side][n])
+                self.stones[self.turn][6].append(dropped_stone)  # add to new pit
+                # just incase, stop the stone from moving
+                self.set_stationary(dropped_stone)
+                
+
         # no more stones in the clicked pit
         if self.sum_stones(0) == 0 or self.sum_stones(1) == 0:
             # there are no more stones on one side of the board
@@ -287,9 +336,15 @@ class Classic():
                 self.winner = 1
             else:
                 self.winner = "TIE"
-        if self.turn == 0:
+        if side == self.turn and n == 6:
+            # landed into the seed store
+            # as per the rules, they get to go again
+            pass # do nothing so self.turn is the same
+        elif self.turn == 0:
+            print('op turn')
             self.turn = 1
         else:
+            print('my turn')
             self.turn = 0
 
     def get_turn(self):
@@ -340,6 +395,10 @@ class Classic():
             else:
                 side = 0
         return side, n
+
+    def adj_pit(self, side, n):
+        """Return the adjacent pit"""
+        return -side+1, 5-n
 
     def sum_stones(self, plr):
         """Return the total stones on the given side."""

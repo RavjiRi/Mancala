@@ -42,13 +42,21 @@ class Mancala(ShowBase):
         self.cTrav = CollisionTraverser('physics') # automatically handle physics operations
 
         self.clickableTag = "clickable" # clickable objects have this tag
-        
-        from gamemodes.classic import Classic
+
+        from gamemodes.congklak import Classic
         self.controller = Classic(self) # game controller
         self.controller.load() # load board from external file
         
         self.enableGravity()
         self.startMouse()
+
+    def clearScene(self):
+        # remove everything but the camera
+        for i in self.render.getChildren():
+            if i.name != 'camera':
+                i.removeNode()
+        self.render.clearLight()
+
     def onMouseClick(self):
         '''
             code used from panda3d documentation
@@ -93,6 +101,34 @@ class Mancala(ShowBase):
         b = DirectButton(text="START",
                          scale=.05, command=func, frameSize=(-2, 2, -1, 1))
         return b
+    def createGamemodeButton(self):
+        # add gamemode button
+        b = DirectButton(text="GAMEMODE",
+                         scale=.05,
+                         command=self.PopupWindowOpen,
+                         frameSize=(-2, 2, -1, 1),
+                         pos=(0, 0, -0.3),
+                         text_scale=(0.6, 0.6))
+        return b
+    def PopupWindowOpen(self):
+        from subprocess import Popen, PIPE
+        p = Popen(['python', 'popen.py'], stdout=PIPE, stderr=PIPE)
+        stdout, stderr = p.communicate()
+        gamemode_path = stdout.decode('utf-8')
+        
+        # import file directly
+        # https://docs.python.org/3/library/importlib.html#importing-a-source-file-directly
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("gamemode", gamemode_path)
+        module = importlib.util.module_from_spec(spec)
+        sys.modules["gamemode"] = module # attach to sys.modules
+        spec.loader.exec_module(module)
+        self.controller = module.Classic(self) # game controller
+
+        self.clearScene()
+        
+        self.controller.load() # load board from external file
+
     def createTurnText(self):
         roboto = self.loader.loadFont("fonts/Roboto/Roboto-Regular.ttf")
         return DirectLabel(text='Your turn',
@@ -124,15 +160,20 @@ class Mancala(ShowBase):
 
 def main(app):
     event = threading.Event()
-    controller = app.controller # game controller
-    choiceCeil = len(controller.clickables[1])-1 # the max number (ceiling) the rng can generate (because of the amount of clickables)
     turnText = app.createTurnText()
     turnText.hide()
     
     button = app.createStartButton(event.set)
+    gm_button = app.createGamemodeButton()
     event.wait() # wait for click
     event.clear() # reset 'internal flag' (read threading docs)
     button.hide()
+    gm_button.hide()
+
+    controller = app.controller # game controller
+    choiceCeil = len(controller.clickables[1])-1 # the max number (ceiling) the rng can generate (because of the amount of clickables)
+    
+    
     while not controller.is_game_complete():
         turn = controller.get_turn()
         turnText.show()

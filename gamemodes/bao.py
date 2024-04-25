@@ -76,7 +76,7 @@ class Classic():
         self.hoverables = {}  # dictionary to store hoverables
         self.stonesPerPit = 4
         # path to classic assets folder
-        self.classic_assets = Path(__file__).parent.resolve()/'classic_assets'
+        self.classic_assets = Path(__file__).parent.resolve()/'bao_assets'
 
     def load(self):
         """Load the board on to the scene (render)."""
@@ -107,7 +107,7 @@ class Classic():
         self.board = app.loader.loadModel(self.classic_assets/'mancala.obj', noCache=True)
         # rotate because I made the model wrong...
         self.board.setP(self.board, 90)
-        self.board.setR(self.board, 10)
+        #self.board.setR(self.board, 10)
         self.board.reparentTo(app.render)
 
         random_colour = ColourGenerator()
@@ -246,12 +246,6 @@ class Classic():
             app.taskMgr.removeTasksMatching("moveTask")
 
             side, n = self.next_pit(side, n)  # get the next pit
-
-            if side != self.turn and n == 6:
-                # it is the opponents mancala
-                # skip per the rules
-                side, n = self.next_pit(side, n)  # get the next pit
-
             go_to = self.hoverables[side][n].getPos()+Vec3(0, 0, 5)
             for stone in clicked_stones:
                 # move above the next pit
