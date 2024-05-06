@@ -3,6 +3,7 @@ from random import randint
 from queue import Queue
 import threading # don't check for these libraries as these are core libraries
 import sys
+import codecs
 from pathlib import Path
 from os import _exit
 
@@ -42,6 +43,8 @@ class Mancala(ShowBase):
         self.cTrav = CollisionTraverser('physics') # automatically handle physics operations
 
         self.clickableTag = "clickable" # clickable objects have this tag
+        self.roboto = self.loader.loadFont("fonts/Roboto/Roboto-Regular.ttf")
+        self.roboto_bold = self.loader.loadFont("fonts/Roboto/Roboto-Bold.ttf")
 
         from gamemodes.congklak import Classic
         self.controller = Classic(self) # game controller
@@ -110,6 +113,52 @@ class Mancala(ShowBase):
                          pos=(0, 0, -0.3),
                          text_scale=(0.6, 0.6))
         return b
+    def createInstructionsButton(self):
+        # add gamemode button
+        b = DirectButton(text="INSTRUCTIONS",
+                         scale=.05,
+                         command=self.OpenInstructions,
+                         frameSize=(-2, 2, -1, 1),
+                         pos=(0, 0, -0.6),
+                         text_scale=(0.6, 0.6))
+        return b
+    def OpenInstructions(self):
+        '''Opens the instructions and add bold characters, etc
+            https://docs.panda3d.org/1.10/python/programming/gui/embedded-text-properties
+            
+        '''
+        tpBold = TextProperties()
+        tpBold.setFont(self.roboto_bold)
+        tpMgr = TextPropertiesManager.getGlobalPtr()
+        tpMgr.setProperties('bold', tpBold)
+
+        ins_text = self.controller.instructions
+        # direct gui cannot apply bold unless \1 and \2 are ascii
+        # so decode the raw str from file to 'unicode_escape'
+        ins_text = codecs.decode(ins_text, 'unicode_escape')
+
+        # create an inital height for the canvas
+        canvas_height = 3
+        
+        self.ins_frame = DirectScrolledFrame(pos=(0, 0, 0.65), frameColor=(0.5, 0.5, 0.5, 1),
+                         canvasSize = (0, 1, -.1, canvas_height), frameSize=(-0.7, 0.7, -1.5, 0.1))
+        self.button = DirectLabel(text=ins_text,
+                                  parent = self.ins_frame.getCanvas(), frameColor=(0, 0, 0, 0.5),
+                                  pos=(2/3, 0, canvas_height-0.1), text_font=self.roboto,
+                                  text_wordwrap=12, text_scale=0.1, text_align=TextNode.ACenter)
+
+        # Panda3D as far as I am aware of doesn't have a good system
+        # for fixing text within a specific height
+
+        # so get the height of the button
+        w1, w2, h1, h2 = self.button.getBounds()
+        text_height = abs(h1)+abs(h2) # h1 may be negative
+        
+        self.ins_frame['canvasSize']=(0, 1, -.1, text_height)
+        self.button.setPos(2/3, 0, text_height-.1)
+
+        # ADD AN EXIT BUTTON
+
     def PopupWindowOpen(self):
         from subprocess import Popen, PIPE
         p = Popen(['python', 'popen.py'], stdout=PIPE, stderr=PIPE)
@@ -130,10 +179,9 @@ class Mancala(ShowBase):
         self.controller.load() # load board from external file
 
     def createTurnText(self):
-        roboto = self.loader.loadFont("fonts/Roboto/Roboto-Regular.ttf")
         return DirectLabel(text='Your turn',
                            pos=(0, 0, 0.8), text_scale = (0.15, 0.15), frameColor=(0, 0, 0, 0),
-                           textMayChange=True, parent=aspect2d, text_font=roboto)
+                           textMayChange=True, parent=aspect2d, text_font=self.roboto)
     def enableGravity(self):
         gravityFN = ForceNode('world-forces')
         gravityFNP = self.render.attachNewNode(gravityFN)
@@ -163,11 +211,12 @@ def main(app):
     turnText = app.createTurnText()
     turnText.hide()
     
-    button = app.createStartButton(event.set)
+    st_button = app.createStartButton(event.set)
     gm_button = app.createGamemodeButton()
+    ins_button = app.createInstructionsButton()
     event.wait() # wait for click
     event.clear() # reset 'internal flag' (read threading docs)
-    button.hide()
+    st_button.hide()
     gm_button.hide()
 
     controller = app.controller # game controller
@@ -175,7 +224,7 @@ def main(app):
     
     
     while not controller.is_game_complete():
-        turn = controller.get_turn()
+        turn = controller.turn
         turnText.show()
         if turn == 0:
             turnText['text'] = "Your turn"
@@ -197,12 +246,16 @@ def main(app):
                     hasStones = True
             
         controller.clicked_pit(clicked_side, clicked_n)
-    if controller.get_winner() == 0:
+    if controller.winner == 0:
         print("You win!")
-    elif controller.get_winner() == 1:
+        turnText['text'] = "You win!"
+    elif controller.winner == 1:
         print("You lose...")
+        turnText['text'] = "You lose..."
     else:
         print("You tie")
+        turnText['text'] = "Tie"
+    turnText.show()
 
 # main guard for threading
 if __name__ == "__main__":

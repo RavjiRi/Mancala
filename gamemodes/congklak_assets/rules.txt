@@ -1,0 +1,23 @@
+\1bold\1OBJECTIVE:\2
+
+Both players try to collect the most stones in the congklak seed store as possible
+
+The game ends when at least one side of the board is empty
+The winner is the player with the most seeds in the seed store
+
+\1bold\1PARTS OF THE BOARD:\2
+
+The congklak has 6 pits on each side of the board
+The large pit to the right of the player is their seed store
+The large pit to the left of the player is the opponents seed store
+
+\1bold\1HOW TO PLAY:\2
+
+When a pit is clicked, the seeds will be dropped one by one clockwise around the board
+The stones will not be dropped in the opponents seed store
+
+If the last stone lands...
+ - in the players own seed store, they get to go again
+ - on a pit with seeds, they pick up the seeds and continue dropping clockwise
+ - on an empty pit on the players side, they pick up the opposite stones and put it in their seed store
+ - on an empty pit on the opponents side, the players turn ends and it is now the opponents turn

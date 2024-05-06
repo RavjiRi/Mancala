@@ -8,9 +8,10 @@ This file is the controller for the main mancala.py on:
 from panda3d.core import *
 from panda3d.physics import *
 from direct.task import *
-from time import sleep
+from time import sleep, time
 from random import random, randint
 from pathlib import Path
+import itertools
 
 # Bitmasks are like collision groups
 # if the 'from' and 'to' objects have at least one digit in common
@@ -63,6 +64,7 @@ class ColourGenerator():
 class Classic():
     """Functions that are required and called by the main code."""
 
+    #__slots__ = []
     def __init__(self, app):
         """Setup the class variables."""
         self.app = app  # store app for use outside init function
@@ -75,6 +77,9 @@ class Classic():
         self.clickables = {}  # dictionary to store clickables
         self.hoverables = {}  # dictionary to store hoverables
         self.stonesPerPit = 1#7
+        self.stones_timeout = 5 # move stones timeout
+        self._winner = None # _ means it is a protected variable (PEP)
+        self._turn = 0  # player 0 goes first
         # path to classic assets folder
         self.classic_assets = Path(__file__).parent.resolve()/'congklak_assets'
 
@@ -188,8 +193,8 @@ class Classic():
                     app.cTrav.addCollider(cnode_path, app.pusher)  # add to traverser which handles physics
                     # show collision objects for debugging
                     # cnodePath.show()
-            # board collisions for the mancala
-            # (where the stones are banked, not the board itself)
+            # board collisions for the stone stores
+            # this is where the stones are banked
             segment = app.loader.loadModel(self.classic_assets/"collision_assets/Player{}/Mancala.obj".format(side), noCache=True)
             segment.setP(segment, 90)
             segment.reparentTo(app.render)
@@ -222,7 +227,6 @@ class Classic():
         np = app.render.attachNewNode(cn)
         np.node().addSolid(plane)
 
-        self.turn = 0  # player 0 goes first
         self.gameComplete = False
 
     def clicked_pit(self, clicked_side, clicked_n):
@@ -233,39 +237,33 @@ class Classic():
         side = clicked_side
         n = clicked_n
         # repeat for the # of stones in the clicked pit
-        for i in range(0, len(clicked_stones)):
+        for i in range(len(clicked_stones)):
             current_pit = self.hoverables[side][n]
             go_to = current_pit.getPos()+Vec3(0, 0, 5)
-            for stone in clicked_stones:
-                # hover above the current pit
-                app.taskMgr.add(
-                    self.align_position, "moveTask",
-                    extraArgs=["moveTask", stone, go_to]
-                    )
+
+            self.move_stones(clicked_stones, go_to)
             sleep(1)
-            app.taskMgr.removeTasksMatching("moveTask")
+            self.drop_all_stones()
 
             side, n = self.next_pit(side, n)  # get the next pit
 
-            if side != self.turn and n == 6:
-                # it is the opponents mancala
+            if side != self._turn and n == 6:
+                # about to drop in the opponents store
                 # skip per the rules
                 side, n = self.next_pit(side, n)  # get the next pit
 
             go_to = self.hoverables[side][n].getPos()+Vec3(0, 0, 5)
-            for stone in clicked_stones:
-                # move above the next pit
-                app.taskMgr.add(
-                    self.align_position, "moveTask",
-                    extraArgs=["moveTask", stone, go_to]
-                    )
+
+            self.move_stones(clicked_stones, go_to)
             sleep(1)
-            app.taskMgr.removeTasksMatching("moveTask")
+            self.drop_all_stones()
+
             for stone in clicked_stones:
                 # stop stones from moving
+                # in case it has any glitchy velocity
                 self.set_stationary(stone)
 
-            # remove last stone in array and return it
+            # pop removes last stone in array and return it
             dropped_stone = clicked_stones.pop()
             cn = dropped_stone.getParent().find('cnode').node()  # collision node
             # set the collide masks to the collide mask of the new pit
@@ -274,90 +272,110 @@ class Classic():
             self.stones[side][n].append(dropped_stone)  # add to new pit
             # just incase, stop the stone from moving
             self.set_stationary(dropped_stone)
-        # end of 'sowing' stones
-
-        if n != 6:
-            # last stone was dropped and not dropped in the mancala (seed store)
-            if len(self.stones[side][n]) > 1:
-                # as per the rules
-                # the last stone lands in a pit with stones (so #stones > 1)
-                # pickup and continue
-                self.clicked_pit(side, n)
-                # once function is finished exit or the turns will mess up
-                # this is because the self.clicked_pit will already switch the turns
-                return
-            elif len(self.stones[side][n]) == 1 and side == self.turn:
-                # as per the rules
-                # the pit was originally without stones and on the players side
-                # so collect adjacent stones into the players mancala
-                adj_side, adj_n = self.adj_pit(side, n)
-                clicked_stones = self.stones[adj_side][adj_n]
-                go_to = self.hoverables[self.turn][6].getPos()+Vec3(0, 0, 5)
-
-                for stone in clicked_stones+self.stones[side][n][0:1]:
-                    # move above the next pit
-                    app.taskMgr.add(
-                        self.align_position, "moveTask",
-                        extraArgs=["moveTask", stone, go_to]
-                        )
-                sleep(4.5)
-                app.taskMgr.removeTasksMatching("moveTask")
-
-                for dropped_stone in clicked_stones:
-                    cn = dropped_stone.getParent().find('cnode').node()  # collision node
-                    # set the collide masks to the collide mask of the new pit
-                    cn.setFromCollideMask(BitMasks[side][n])
-                    cn.setIntoCollideMask(BitMasks[side][n])
-                    self.stones[self.turn][6].append(dropped_stone)  # add to new pit
-                    # just incase, stop the stone from moving
-                    self.set_stationary(dropped_stone)
-                clicked_stones.clear()  # empty the array
-
-                dropped_stone = self.stones[side][n].pop() # remove and get value
-                cn = dropped_stone.getParent().find('cnode').node()  # collision node
-                # set the collide masks to the collide mask of the new pit
-                cn.setFromCollideMask(BitMasks[side][n])
-                cn.setIntoCollideMask(BitMasks[side][n])
-                self.stones[self.turn][6].append(dropped_stone)  # add to new pit
-                # just incase, stop the stone from moving
-                self.set_stationary(dropped_stone)
-                
-
         # no more stones in the clicked pit
+
+        if side == self._turn and len(self.stones[side][n]) == 1 and n != 6:
+            # the last stone landed on:
+            #   their own side
+            #   AND was previously empty (now it has one stone)
+            #   AND it is not a seed store (has to be a pit)
+            # as per the rules, bank the stone and the adj stones
+            current_pit = self.hoverables[side][n]
+            go_to = current_pit.getPos()+Vec3(0, 0, 5)
+            
+            adj_side, adj_n = self.adj_pit(side, n)
+            adj_pit = self.hoverables[adj_side][adj_n]
+            adj_go_to = adj_pit.getPos()+Vec3(0, 0, 5)
+
+            # hover over the respective pits
+            self.move_stones(self.stones[side][n], go_to)
+            self.move_stones(self.stones[adj_side][adj_n], adj_go_to)
+
+            seed_store = self.hoverables[self._turn][6]
+            go_to = seed_store.getPos()+Vec3(0, 0, 5)
+            self.drop_all_stones()
+
+            # hover over the seed store
+            self.move_stones(self.stones[side][n], go_to)
+            self.move_stones(self.stones[adj_side][adj_n], go_to)
+
+            self.wait_for_stones(self.stones[adj_side][adj_n], go_to)
+            self.wait_for_stones(self.stones[side][n], go_to)
+
+            self.drop_all_stones()
+            for stone in itertools.chain(self.stones[adj_side][adj_n], self.stones[side][n]):
+                # pop removes last stone in array and return it
+                # dropped_stone = self.stones[adj_side][adj_n].pop()
+                cn = stone.getParent().find('cnode').node()  # collision node
+                # set the collide masks to the collide mask of the new pit
+                cn.setFromCollideMask(BitMasks[self._turn][6])
+                cn.setIntoCollideMask(BitMasks[self._turn][6])
+                self.stones[self._turn][6].append(stone)  # add to seed store
+                
+                # stop stones from moving
+                # in case it has any glitchy velocity
+                self.set_stationary(stone)
+            self.stones[adj_side][adj_n].clear()
+            self.stones[side][n].clear()
+        elif len(self.stones[side][n]) > 1 and n != 6:
+            # the last stone landed on:
+            #   has at least one stone previously (so more than one stone now)
+            #   AND it is not a seed store (has to be a pit)
+            # as per the rules, continue going around
+            sleep(1.5) # some time for the stones to drop into the pit
+            return self.clicked_pit(side, n)
+
+        # if there are no more stones on one side of the board...
         if self.sum_stones(0) == 0 or self.sum_stones(1) == 0:
             # there are no more stones on one side of the board
             # this means game is finished
             self.gameComplete = True
             if len(self.stones[0][6]) > len(self.stones[1][6]):
-                # player 0 has more stones in their mancala
-                self.winner = 0
+                # player 0 has more stones in their store
+                self._winner = 0
             elif len(self.stones[0][6]) < len(self.stones[1][6]):
-                # player 1 has more stones in their mancala
-                self.winner = 1
+                # player 1 has more stones in their store
+                self._winner = 1
             else:
-                self.winner = "TIE"
-        if side == self.turn and n == 6:
-            # landed into the seed store
-            # as per the rules, they get to go again
-            pass # do nothing so self.turn is the same
-        elif self.turn == 0:
-            print('op turn')
-            self.turn = 1
-        else:
-            print('my turn')
-            self.turn = 0
+                self._winner = "TIE"
 
-    def get_turn(self):
-        """Return the current turn."""
-        return self.turn
+        if side == self._turn and n == 6:
+            # last stone landed in the stone store so go again
+            pass
+        elif self._turn == 0:
+            self._turn = 1
+        else:
+            self._turn = 0
+
+    @property
+    def turn(self):
+        """Return the current turn.
+
+        This function has a property decorator so it can be accessed like a variable/property
+        This means self._turn is not exposed and is less likely to be externally edited
+        """
+        return self._turn
 
     def is_game_complete(self):
         """Return if the game is complete."""
         return self.gameComplete
 
-    def get_winner(self):
-        """Return the winner."""
-        return self.winner
+    @property
+    def instructions(self):
+        rules_txt = open(self.classic_assets/"rules.txt", mode='r')
+        instructions = ""
+        with rules_txt as file:
+            instructions = file.read()
+        return instructions
+
+    @property
+    def winner(self):
+        """Return the winner.
+
+        This function has a property decorator so it can be accessed like a variable/property
+        This means self._winner is not exposed and is less likely to be externally edited
+        """
+        return self._winner
 
     ''' code used by the this class only '''
     def align_position(self, task, stone, go_to: Vec3):
@@ -374,6 +392,30 @@ class Classic():
         ratio = (2/(1+pow(2.7, -move_dist))-1)  # sigmoid function, to calculate the speed of the stone
         phy_obj.setVelocity(move_dir*max_speed*ratio)
         return Task.cont  # task finished (see panda3d task docs)
+
+    def wait_for_stones(self, stones, pos: Vec3):
+        '''Wait for stones to move to the pos
+        '''
+        atPos = False # are all stones are at pos
+        startTime = time()
+        while not atPos or time()-startTime >= self.stones_timeout:
+            sleep(0.1)
+            atPos = True
+            for stone in stones:
+                thruster = stone.get_parent()  # this should be a node path
+                if (thruster.getPos()-pos).length() >= 0.1:
+                    atPos = False # not at position!
+        return atPos
+    def move_stones(self, clicked_stones, go_to: Vec3):
+        for stone in clicked_stones:
+            # hover above the current pit
+            self.app.taskMgr.add(
+                self.align_position, "moveTask",
+                extraArgs=["moveTask", stone, go_to]
+            )
+
+    def drop_all_stones(self):
+        self.app.taskMgr.removeTasksMatching("moveTask")
 
     def next_pit(self, side, n):
         """Return the next pit to the right.

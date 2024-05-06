@@ -1,0 +1,18 @@
+OBJECTIVE:
+
+Both players try to collect the most stones in the mandala store as possible
+
+The game ends when at least one side of the board is empty
+The winner is the player with the most stones
+
+PARTS OF THE BOARD:
+
+The mancala has 6 pits on each side of the board
+The large pit to the right of the player is their store
+The large pit to the left of the player is the opponents store
+
+HOW TO PLAY:
+
+When a pit is clicked, the stones will be dropped one by one clockwise around the board
+The stones will not be dropped in the opponents store
+If the last stone lands in the players own store, they get to go again

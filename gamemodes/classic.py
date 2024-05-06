@@ -75,6 +75,8 @@ class Classic():
         self.clickables = {}  # dictionary to store clickables
         self.hoverables = {}  # dictionary to store hoverables
         self.stonesPerPit = 4
+        self._winner = None # _ means it is a protected variable (PEP)
+        self._turn = 0  # player 0 goes first
         # path to classic assets folder
         self.classic_assets = Path(__file__).parent.resolve()/'classic_assets'
 
@@ -188,17 +190,17 @@ class Classic():
                     app.cTrav.addCollider(cnode_path, app.pusher)  # add to traverser which handles physics
                     # show collision objects for debugging
                     # cnodePath.show()
-            # board collisions for the mancala
-            # (where the stones are banked, not the board itself)
+            # board collisions for the stone stores
+            # this is where the stones are banked
             segment = app.loader.loadModel(self.classic_assets/"collision_assets/Player{}/Mancala.obj".format(side), noCache=True)
             segment.setP(segment, 90)
             segment.reparentTo(app.render)
             segment.hide()  # should not be visible
             for model in segment.find_all_matches("**/+GeomNode"):
-                # add a collide mask so stones in the mancala don't fall through
-                # the mancala is the 6th from the left
+                # add a collide mask so stones in the store don't fall through
+                # the stone store is the 6th from the left
                 model.setCollideMask(BitMasks[side][6])
-            self.stones[side][6] = []  # create the array to store stones in mancala
+            self.stones[side][6] = []  # create the array to store stones in
             # create hoverable point
             hoverable = app.loader.loadModel('models/misc/sphere')
             self.hoverables[side][6] = hoverable
@@ -222,7 +224,6 @@ class Classic():
         np = app.render.attachNewNode(cn)
         np.node().addSolid(plane)
 
-        self.turn = 0  # player 0 goes first
         self.gameComplete = False
 
     def clicked_pit(self, clicked_side, clicked_n):
@@ -232,40 +233,34 @@ class Classic():
 
         side = clicked_side
         n = clicked_n
-        # while clicked_stones is NOT empty
-        while clicked_stones:
+        # repeat for the # of stones in the clicked pit
+        for i in range(0, len(clicked_stones)):
             current_pit = self.hoverables[side][n]
             go_to = current_pit.getPos()+Vec3(0, 0, 5)
-            for stone in clicked_stones:
-                # hover above the current pit
-                app.taskMgr.add(
-                    self.align_position, "moveTask",
-                    extraArgs=["moveTask", stone, go_to]
-                    )
+
+            self.move_stones(clicked_stones, go_to)
             sleep(1)
-            app.taskMgr.removeTasksMatching("moveTask")
+            self.drop_all_stones()
 
             side, n = self.next_pit(side, n)  # get the next pit
 
-            if side != self.turn and n == 6:
-                # it is the opponents mancala
+            if side != self._turn and n == 6:
+                # about to drop in the opponents store
                 # skip per the rules
                 side, n = self.next_pit(side, n)  # get the next pit
 
             go_to = self.hoverables[side][n].getPos()+Vec3(0, 0, 5)
-            for stone in clicked_stones:
-                # move above the next pit
-                app.taskMgr.add(
-                    self.align_position, "moveTask",
-                    extraArgs=["moveTask", stone, go_to]
-                    )
+
+            self.move_stones(clicked_stones, go_to)
             sleep(1)
-            app.taskMgr.removeTasksMatching("moveTask")
+            self.drop_all_stones()
+
             for stone in clicked_stones:
                 # stop stones from moving
+                # in case it has any glitchy velocity
                 self.set_stationary(stone)
 
-            # remove last stone in array and return it
+            # pop removes last stone in array and return it
             dropped_stone = clicked_stones.pop()
             cn = dropped_stone.getParent().find('cnode').node()  # collision node
             # set the collide masks to the collide mask of the new pit
@@ -275,34 +270,58 @@ class Classic():
             # just incase, stop the stone from moving
             self.set_stationary(dropped_stone)
         # no more stones in the clicked pit
+
+        # if there are no more stones on one side of the board...
         if self.sum_stones(0) == 0 or self.sum_stones(1) == 0:
             # there are no more stones on one side of the board
             # this means game is finished
             self.gameComplete = True
             if len(self.stones[0][6]) > len(self.stones[1][6]):
-                # player 0 has more stones in their mancala
-                self.winner = 0
+                # player 0 has more stones in their store
+                self._winner = 0
             elif len(self.stones[0][6]) < len(self.stones[1][6]):
-                # player 1 has more stones in their mancala
-                self.winner = 1
+                # player 1 has more stones in their store
+                self._winner = 1
             else:
-                self.winner = "TIE"
-        if self.turn == 0:
-            self.turn = 1
-        else:
-            self.turn = 0
+                self._winner = "TIE"
 
-    def get_turn(self):
-        """Return the current turn."""
-        return self.turn
+        if side == self._turn and n == 6:
+            # last stone landed in the stone store so go again
+            pass
+        elif self._turn == 0:
+            self._turn = 1
+        else:
+            self._turn = 0
+
+    @property
+    def turn(self):
+        """Return the current turn.
+
+        This function has a property decorator so it can be accessed like a variable/property
+        This means self._turn is not exposed and is less likely to be externally edited
+        """
+        return self._turn
 
     def is_game_complete(self):
         """Return if the game is complete."""
         return self.gameComplete
 
-    def get_winner(self):
-        """Return the winner."""
-        return self.winner
+    @property
+    def instructions(self):
+        rules_txt = open(self.classic_assets/"rules.txt", mode='r')
+        instructions = ""
+        with rules_txt as file:
+            instructions = file.read()
+        return instructions
+
+    @property
+    def winner(self):
+        """Return the winner.
+
+        This function has a property decorator so it can be accessed like a variable/property
+        This means self._winner is not exposed and is less likely to be externally edited
+        """
+        return self._winner
 
     ''' code used by the this class only '''
     def align_position(self, task, stone, go_to: Vec3):
@@ -319,6 +338,17 @@ class Classic():
         ratio = (2/(1+pow(2.7, -move_dist))-1)  # sigmoid function, to calculate the speed of the stone
         phy_obj.setVelocity(move_dir*max_speed*ratio)
         return Task.cont  # task finished (see panda3d task docs)
+
+    def move_stones(self, clicked_stones, go_to: Vec3):
+        for stone in clicked_stones:
+            # hover above the current pit
+            self.app.taskMgr.add(
+                self.align_position, "moveTask",
+                extraArgs=["moveTask", stone, go_to]
+            )
+
+    def drop_all_stones(self):
+        self.app.taskMgr.removeTasksMatching("moveTask")
 
     def next_pit(self, side, n):
         """Return the next pit to the right.
