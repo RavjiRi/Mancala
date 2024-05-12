@@ -1,7 +1,7 @@
 """
 This file is the controller for the main mancala.py on:
-    - Creating a mancala board
-    - Moving stones
+    - Creating a congklak board
+    - Moving seeds (stones equivalent in mancala)
     - and more...
 """
 
@@ -61,18 +61,18 @@ class ColourGenerator():
         return self.COLOURS[randint(0, len(self.COLOURS)-1)]
 
 
-class Classic():
+class main():
     """Functions that are required and called by the main code."""
 
     #__slots__ = []
     def __init__(self, app):
         """Setup the class variables."""
-        self.app = app  # store app for use outside init function
+        self._app = app  # store app for use outside init function
         # y positions of clickables from left to right
-        self.y_pos_click = [9.8, 5.8, 1.9, -1.9, -5.8, -9.8]
+        self._y_pos_click = [9.8, 5.8, 1.9, -1.9, -5.8, -9.8]
         # x positions of clickables
         # (player 0 side x pos is -2 and player 1 is 2)
-        self.x_pos_click = [-2, 2]
+        self._x_pos_click = [-2, 2]
         self.stones = {}  # dictionary to store stones
         self.clickables = {}  # dictionary to store clickables
         self.hoverables = {}  # dictionary to store hoverables
@@ -80,12 +80,13 @@ class Classic():
         self.stones_timeout = 5 # move stones timeout
         self._winner = None # _ means it is a protected variable (PEP)
         self._turn = 0  # player 0 goes first
-        # path to classic assets folder
-        self.classic_assets = Path(__file__).parent.resolve()/'congklak_assets'
+        # path to congklak assets folder
+        self.congklak_assets = Path(__file__).parent.resolve()/'congklak_assets'
+        self._str_instructions = self._instructions_from_file()
 
     def load(self):
         """Load the board on to the scene (render)."""
-        app = self.app  # save space by dropping self
+        app = self._app  # save space by dropping self
 
         # this is so the main code can tell what objects can be clicked on
         app.clickableTag = "clickable"
@@ -109,7 +110,7 @@ class Classic():
         app.render.setLight(lnp)  # add light to render (the scene)
 
         # setup mancala board
-        self.board = app.loader.loadModel(self.classic_assets/'mancala.obj', noCache=True)
+        self.board = app.loader.loadModel(self.congklak_assets/'mancala.obj', noCache=True)
         # rotate because I made the model wrong...
         self.board.setP(self.board, 90)
         self.board.setR(self.board, 10)
@@ -126,7 +127,7 @@ class Classic():
             # clickable obj nth from left
             for n in range(6):
                 # create board collisions for each pit
-                pit = app.loader.loadModel(self.classic_assets/'collision_assets/Player{}/{}.obj'.format(side, n), noCache=True)
+                pit = app.loader.loadModel(self.congklak_assets/'collision_assets/Player{}/{}.obj'.format(side, n), noCache=True)
                 pit.setP(pit, 90)
                 pit.reparentTo(app.render)
                 pit.hide()  # make sure it is not visible
@@ -138,8 +139,8 @@ class Classic():
                 clickable = app.loader.loadModel('models/misc/sphere')
                 self.clickables[side][n] = clickable
                 self.hoverables[side][n] = clickable  # all clickables can be hovered over
-                x_pos = self.x_pos_click[side]  # x pos of the pit
-                y_pos = self.y_pos_click[n]  # y pos of the pit
+                x_pos = self._x_pos_click[side]  # x pos of the pit
+                y_pos = self._y_pos_click[n]  # y pos of the pit
                 clickable.setPos(x_pos, y_pos, 1)
                 clickable.setScale(1.5, 1.5, 1.5)
                 clickable.reparentTo(app.render)
@@ -195,7 +196,7 @@ class Classic():
                     # cnodePath.show()
             # board collisions for the stone stores
             # this is where the stones are banked
-            segment = app.loader.loadModel(self.classic_assets/"collision_assets/Player{}/Mancala.obj".format(side), noCache=True)
+            segment = app.loader.loadModel(self.congklak_assets/"collision_assets/Player{}/Mancala.obj".format(side), noCache=True)
             segment.setP(segment, 90)
             segment.reparentTo(app.render)
             segment.hide()  # should not be visible
@@ -219,7 +220,7 @@ class Classic():
             hoverable.setTag('n', str(6))
             hoverable.reparentTo(app.render)
             # reverse list so the first stones load on the left
-            self.y_pos_click.reverse()
+            self._y_pos_click.reverse()
 
         # backup collsion 'floor' in case the stones fall through the model
         plane = CollisionPlane(Plane(Vec3(0, 0, 1), Point3(0, 0, -0.5)))
@@ -231,7 +232,7 @@ class Classic():
 
     def clicked_pit(self, clicked_side, clicked_n):
         """Move the stones for the given clicked pit."""
-        app = self.app  # save space by dropping self
+        app = self._app  # save space by dropping self
         clicked_stones = self.stones[clicked_side][clicked_n]
 
         side = clicked_side
@@ -243,7 +244,7 @@ class Classic():
 
             self.move_stones(clicked_stones, go_to)
             sleep(1)
-            self.drop_all_stones()
+            self.release_all_stones()
 
             side, n = self.next_pit(side, n)  # get the next pit
 
@@ -256,7 +257,7 @@ class Classic():
 
             self.move_stones(clicked_stones, go_to)
             sleep(1)
-            self.drop_all_stones()
+            self.release_all_stones()
 
             for stone in clicked_stones:
                 # stop stones from moving
@@ -293,16 +294,18 @@ class Classic():
 
             seed_store = self.hoverables[self._turn][6]
             go_to = seed_store.getPos()+Vec3(0, 0, 5)
-            self.drop_all_stones()
+            self.release_all_stones()
 
             # hover over the seed store
             self.move_stones(self.stones[side][n], go_to)
             self.move_stones(self.stones[adj_side][adj_n], go_to)
 
+            # because the stone could potentially move from one side to the other
+            # wait for the stones to arrive at the seed store
             self.wait_for_stones(self.stones[adj_side][adj_n], go_to)
             self.wait_for_stones(self.stones[side][n], go_to)
 
-            self.drop_all_stones()
+            self.release_all_stones()
             for stone in itertools.chain(self.stones[adj_side][adj_n], self.stones[side][n]):
                 # pop removes last stone in array and return it
                 # dropped_stone = self.stones[adj_side][adj_n].pop()
@@ -360,13 +363,17 @@ class Classic():
         """Return if the game is complete."""
         return self.gameComplete
 
-    @property
-    def instructions(self):
-        rules_txt = open(self.classic_assets/"rules.txt", mode='r')
+    def _instructions_from_file(self):
+        rules_txt = open(self.congklak_assets/"rules.txt", mode='r')
         instructions = ""
         with rules_txt as file:
             instructions = file.read()
+
         return instructions
+
+    @property
+    def instructions(self):
+        return self._str_instructions
 
     @property
     def winner(self):
@@ -403,19 +410,19 @@ class Classic():
             atPos = True
             for stone in stones:
                 thruster = stone.get_parent()  # this should be a node path
-                if (thruster.getPos()-pos).length() >= 0.1:
+                if (thruster.getPos()-pos).length() >= 0.5:
                     atPos = False # not at position!
         return atPos
     def move_stones(self, clicked_stones, go_to: Vec3):
         for stone in clicked_stones:
             # hover above the current pit
-            self.app.taskMgr.add(
+            self._app.taskMgr.add(
                 self.align_position, "moveTask",
                 extraArgs=["moveTask", stone, go_to]
             )
 
-    def drop_all_stones(self):
-        self.app.taskMgr.removeTasksMatching("moveTask")
+    def release_all_stones(self):
+        self._app.taskMgr.removeTasksMatching("moveTask")
 
     def next_pit(self, side, n):
         """Return the next pit to the right.
