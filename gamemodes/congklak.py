@@ -1,17 +1,31 @@
 """
+Congklak written in Python.
+
 This file is the controller for the main mancala.py on:
     - Creating a congklak board
     - Moving seeds (stones equivalent in mancala)
     - and more...
+
+Author: Ritesh Ravji
 """
 
-from panda3d.core import *
-from panda3d.physics import *
-from direct.task import *
-from time import sleep, time
-from random import random, randint
-from pathlib import Path
 import itertools
+from pathlib import Path
+from time import sleep, time
+from typing import Union, Iterable
+from random import random, randint
+
+# PEP: in order to preserve continuity, use camel case variable names
+# this is because Panda3D is built on C so it uses camel case.
+
+try:
+    from panda3d.core import *
+    from panda3d.physics import *
+    from direct.task import *
+except ImportError:
+    raise ImportError(
+        '''Please import the panda3d library to run this program
+You can do this using pip or https://docs.panda3d.org/1.10/python/introduction/index''')
 
 # Bitmasks are like collision groups
 # if the 'from' and 'to' objects have at least one digit in common
@@ -22,7 +36,7 @@ import itertools
 # saves collision calculation between different stones in different pits which
 # will never collide (this saves a lot of work as there 48 stones)
 
-BitMasks = {
+BITMASKS = {
         0: {
             0: BitMask32(0x1),  # 0000 0000 0000 0000 0000 0000 0000 0001
             1: BitMask32(0x2),  # 0000 ... 0010
@@ -44,10 +58,10 @@ BitMasks = {
     }
 
 
-class ColourGenerator():
+class ColourGenerator:
     """Random colour generator."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Define an array of colours."""
         self.COLOURS = [
             (.85, 0, 0, 0),  # red
@@ -56,67 +70,91 @@ class ColourGenerator():
             (.85, 0, .85, 0)  # pink
             ]
 
-    def next(self):
+    def __next__(self) -> Iterable[Union[float, float, float, float]]:
         """Return a random colour."""
         return self.COLOURS[randint(0, len(self.COLOURS)-1)]
+
+    def __iter__(self):
+        """Return iterator."""
+        return self
 
 
 class main():
     """Functions that are required and called by the main code."""
 
-    #__slots__ = []
-    def __init__(self, app):
-        """Setup the class variables."""
-        self._app = app  # store app for use outside init function
+    # __slots__ = []
+    def __init__(self, app: object) -> None:
+        """Setup the class variables.
+
+        This function is run when the class is initalised
+        Setup the variables required for the rest of the class
+
+        Args:
+            app (object): The Mancala.py main class responsible for the app and window
+        Returns:
+            None
+        """
+        self._APP = app  # store app for use outside init function
         # y positions of clickables from left to right
+        # not constant as it is reversed later
         self._y_pos_click = [9.8, 5.8, 1.9, -1.9, -5.8, -9.8]
         # x positions of clickables
         # (player 0 side x pos is -2 and player 1 is 2)
-        self._x_pos_click = [-2, 2]
+        self._X_POS_CLICK = [-2, 2]
         self.stones = {}  # dictionary to store stones
         self.clickables = {}  # dictionary to store clickables
         self.hoverables = {}  # dictionary to store hoverables
-        self.stonesPerPit = 1#7
-        self.stones_timeout = 5 # move stones timeout
-        self._winner = None # _ means it is a protected variable (PEP)
+        self.STONES_PER_PIT = 1
+        self.STONES_TIMEOUT = 5
+        self._winner = None  # _ means it is a protected variable (PEP)
         self._turn = 0  # player 0 goes first
         # path to congklak assets folder
-        self.congklak_assets = Path(__file__).parent.resolve()/'congklak_assets'
-        self._str_instructions = self._instructions_from_file()
+        self.CONGKLAK_ASSETS = Path(__file__).parent.resolve()/'congklak_assets'
+        self._STR_INSTRUCTIONS = self._instructionsFromFile()
 
-    def load(self):
-        """Load the board on to the scene (render)."""
-        app = self._app  # save space by dropping self
+    def load(self) -> None:
+        """Load the board on to the scene (render).
+
+        This function is called by the main Mancala.py file
+        Set up and load the board, place stones, setup collisions, etc
+
+        Args:
+            None
+        Returns:
+            None
+        """
+        APP = self._APP  # save space by dropping self
 
         # this is so the main code can tell what objects can be clicked on
-        app.clickableTag = "clickable"
+        APP.CLICKABLE_TAG = "clickable"
 
         # setup camera
-        app.camera.setPos(-30, 0, 40)  # by experimentation of what looks nice
-        app.camera.lookAt(0, 0, 0)  # look the the board which is at the center
-        app.camLens.setFov(50)  # default FOV is 40
+        APP.camera.setPos(-30, 0, 40)  # by experimentation of what looks nice
+        APP.camera.lookAt(0, 0, 0)  # look the the board which is at the center
+        APP.camLens.setFov(50)  # default FOV is 40
 
         # debug but NOT recommended because of how much the program slows down
         # traverser.showCollisions(app.render)
 
         # setup directional light for the mancala board
         # as it does not show up without it...
-        light = DirectionalLight("light")
-        light.setColor((1, 1, 1, 1))
-        light.setShadowCaster(True, 1024, 1024)
-        lnp = app.render.attachNewNode(light)  # light node path
-        lnp.setPos(0, 0, 100)
-        lnp.setHpr(0, -90, 0)  # heading, yaw, pitch (the angle of light)
-        app.render.setLight(lnp)  # add light to render (the scene)
+        LIGHT = DirectionalLight("light")
+        LIGHT.setColor((1, 1, 1, 1))
+        LIGHT.setShadowCaster(True, 1024, 1024)
+        LNP = APP.render.attachNewNode(LIGHT)  # light node path
+        LNP.setPos(0, 0, 100)
+        LNP.setHpr(0, -90, 0)  # heading, yaw, pitch (the angle of light)
+        APP.render.setLight(LNP)  # add light to render (the scene)
 
         # setup mancala board
-        self.board = app.loader.loadModel(self.congklak_assets/'mancala.obj', noCache=True)
+        self.BOARD = APP.loader.loadModel(self.CONGKLAK_ASSETS/'mancala.obj',
+                                          noCache=True)
         # rotate because I made the model wrong...
-        self.board.setP(self.board, 90)
-        self.board.setR(self.board, 10)
-        self.board.reparentTo(app.render)
+        self.BOARD.setP(self.BOARD, 90)
+        self.BOARD.setR(self.BOARD, 10)
+        self.BOARD.reparentTo(APP.render)
 
-        random_colour = ColourGenerator()
+        COLOUR_GENERATOR = ColourGenerator()
 
         # loop through the board parts
         # two sides because of two players
@@ -127,27 +165,27 @@ class main():
             # clickable obj nth from left
             for n in range(6):
                 # create board collisions for each pit
-                pit = app.loader.loadModel(self.congklak_assets/'collision_assets/Player{}/{}.obj'.format(side, n), noCache=True)
+                pit = APP.loader.loadModel(self.CONGKLAK_ASSETS/'collision_assets/Player{}/{}.obj'.format(side, n), noCache=True)
                 pit.setP(pit, 90)
-                pit.reparentTo(app.render)
+                pit.reparentTo(APP.render)
                 pit.hide()  # make sure it is not visible
                 for model in pit.find_all_matches("**/+GeomNode"):
                     # add a collide mask so stones in the pit don't fall through
-                    model.setCollideMask(BitMasks[side][n])
+                    model.setCollideMask(BITMASKS[side][n])
 
                 # create clickable points
-                clickable = app.loader.loadModel('models/misc/sphere')
+                clickable = APP.loader.loadModel('models/misc/sphere')
                 self.clickables[side][n] = clickable
                 self.hoverables[side][n] = clickable  # all clickables can be hovered over
-                x_pos = self._x_pos_click[side]  # x pos of the pit
+                x_pos = self._X_POS_CLICK[side]  # x pos of the pit
                 y_pos = self._y_pos_click[n]  # y pos of the pit
                 clickable.setPos(x_pos, y_pos, 1)
                 clickable.setScale(1.5, 1.5, 1.5)
-                clickable.reparentTo(app.render)
+                clickable.reparentTo(APP.render)
                 # change name though it is not important
                 clickable.name = 'clickable ' + str(side) + "-" + str(n)
                 # this is how we will tell if we clicked the clickable
-                clickable.setTag(app.clickableTag, "True")
+                clickable.setTag(APP.CLICKABLE_TAG, "True")
                 clickable.setTag('hover', "True")  # it is hoverable
                 # it is on the side of player 0/1
                 clickable.setTag('side', str(side))
@@ -156,20 +194,20 @@ class main():
 
                 # store stones in array in dictionaries
                 self.stones[side][n] = []
-                for count in range(self.stonesPerPit):
+                for count in range(self.STONES_PER_PIT):
                     # location of clickable object for later
                     x, y, z = clickable.getPos()
-                    stone = app.loader.loadModel('models/misc/sphere')
+                    stone = APP.loader.loadModel('models/misc/sphere')
                     self.stones[side][n].append(stone)
                     stone.setScale(0.35, 0.35, 0.35)
-                    stone.setColor(random_colour.next())
+                    stone.setColor(next(COLOUR_GENERATOR))
 
                     # start physics logic
                     node = NodePath("PhysicsNode")
-                    node.reparentTo(app.render)
+                    node.reparentTo(APP.render)
                     an = ActorNode("stone-physics")
                     panp = node.attachNewNode(an)
-                    app.physicsMgr.attachPhysicalNode(an)
+                    APP.physicsMgr.attachPhysicalNode(an)
                     stone.reparentTo(panp)
 
                     # set stone position
@@ -185,28 +223,28 @@ class main():
                     # into objects are the non moving 'walls'
 
                     # used when the stone is colliding into
-                    cn.setFromCollideMask(BitMasks[side][n])
+                    cn.setFromCollideMask(BITMASKS[side][n])
                     # used when the stone is collided into
-                    cn.setIntoCollideMask(BitMasks[side][n])
+                    cn.setIntoCollideMask(BITMASKS[side][n])
                     cnode_path = panp.attachNewNode(cn)
                     cnode_path.node().addSolid(cs)  # attach collision sphere
-                    app.pusher.addCollider(cnode_path, panp)  # add to physics pusher which keeps it out of other objects
-                    app.cTrav.addCollider(cnode_path, app.pusher)  # add to traverser which handles physics
+                    APP.pusher.addCollider(cnode_path, panp)  # add to physics pusher which keeps it out of other objects
+                    APP.cTrav.addCollider(cnode_path, APP.pusher)  # add to traverser which handles physics
                     # show collision objects for debugging
                     # cnodePath.show()
             # board collisions for the stone stores
             # this is where the stones are banked
-            segment = app.loader.loadModel(self.congklak_assets/"collision_assets/Player{}/Mancala.obj".format(side), noCache=True)
+            segment = APP.loader.loadModel(self.CONGKLAK_ASSETS/"collision_assets/Player{}/Mancala.obj".format(side), noCache=True)
             segment.setP(segment, 90)
-            segment.reparentTo(app.render)
+            segment.reparentTo(APP.render)
             segment.hide()  # should not be visible
             for model in segment.find_all_matches("**/+GeomNode"):
                 # add a collide mask so stones in the mancala don't fall through
                 # the mancala is the 6th from the left
-                model.setCollideMask(BitMasks[side][6])
+                model.setCollideMask(BITMASKS[side][6])
             self.stones[side][6] = []  # create the array to store stones in mancala
             # create hoverable point
-            hoverable = app.loader.loadModel('models/misc/sphere')
+            hoverable = APP.loader.loadModel('models/misc/sphere')
             self.hoverables[side][6] = hoverable
             if side == 0:
                 y_pos = -13.9
@@ -218,61 +256,71 @@ class main():
             hoverable.setTag('hover', "True")
             hoverable.setTag('side', str(side))
             hoverable.setTag('n', str(6))
-            hoverable.reparentTo(app.render)
+            hoverable.reparentTo(APP.render)
             # reverse list so the first stones load on the left
             self._y_pos_click.reverse()
 
         # backup collsion 'floor' in case the stones fall through the model
         plane = CollisionPlane(Plane(Vec3(0, 0, 1), Point3(0, 0, -0.5)))
         cn = CollisionNode('plane')
-        np = app.render.attachNewNode(cn)
+        np = APP.render.attachNewNode(cn)
         np.node().addSolid(plane)
 
         self.gameComplete = False
 
-    def clicked_pit(self, clicked_side, clicked_n):
-        """Move the stones for the given clicked pit."""
-        app = self._app  # save space by dropping self
-        clicked_stones = self.stones[clicked_side][clicked_n]
+    def clickedPit(self, clickedSide: int, clickedN: int) -> None:
+        """Move the stones for the given clicked pit.
 
-        side = clicked_side
-        n = clicked_n
+        This function is called by the main Mancala.py file
+        The whole turn is run on this function
+        
+        Args:
+            clickedSide (int): The side that is clicked
+            clickedN (int): The pit nth from the left that is clicked
+        Returns:
+            None
+        """
+        app = self._APP  # save space by dropping self
+        clickedStones = self.stones[clickedSide][clickedN]
+
+        side = clickedSide
+        n = clickedN
         # repeat for the # of stones in the clicked pit
-        for i in range(len(clicked_stones)):
-            current_pit = self.hoverables[side][n]
-            go_to = current_pit.getPos()+Vec3(0, 0, 5)
+        for i in range(len(clickedStones)):
+            currentPit = self.hoverables[side][n]
+            goTo = currentPit.getPos()+Vec3(0, 0, 5)
 
-            self.move_stones(clicked_stones, go_to)
+            self._moveStones(clickedStones, goTo)
             sleep(1)
-            self.release_all_stones()
+            self._releaseAllStones()
 
-            side, n = self.next_pit(side, n)  # get the next pit
+            side, n = self._nextPit(side, n)  # get the next pit
 
             if side != self._turn and n == 6:
                 # about to drop in the opponents store
                 # skip per the rules
-                side, n = self.next_pit(side, n)  # get the next pit
+                side, n = self._nextPit(side, n)  # get the next pit
 
-            go_to = self.hoverables[side][n].getPos()+Vec3(0, 0, 5)
+            goTo = self.hoverables[side][n].getPos()+Vec3(0, 0, 5)
 
-            self.move_stones(clicked_stones, go_to)
+            self._moveStones(clickedStones, goTo)
             sleep(1)
-            self.release_all_stones()
+            self._releaseAllStones()
 
-            for stone in clicked_stones:
+            for stone in clickedStones:
                 # stop stones from moving
                 # in case it has any glitchy velocity
-                self.set_stationary(stone)
+                self._setStationary(stone)
 
             # pop removes last stone in array and return it
-            dropped_stone = clicked_stones.pop()
-            cn = dropped_stone.getParent().find('cnode').node()  # collision node
+            droppedStone = clickedStones.pop()
+            cn = droppedStone.getParent().find('cnode').node()  # collision node
             # set the collide masks to the collide mask of the new pit
-            cn.setFromCollideMask(BitMasks[side][n])
-            cn.setIntoCollideMask(BitMasks[side][n])
-            self.stones[side][n].append(dropped_stone)  # add to new pit
+            cn.setFromCollideMask(BITMASKS[side][n])
+            cn.setIntoCollideMask(BITMASKS[side][n])
+            self.stones[side][n].append(droppedStone)  # add to new pit
             # just incase, stop the stone from moving
-            self.set_stationary(dropped_stone)
+            self._setStationary(droppedStone)
         # no more stones in the clicked pit
 
         if side == self._turn and len(self.stones[side][n]) == 1 and n != 6:
@@ -281,55 +329,55 @@ class main():
             #   AND was previously empty (now it has one stone)
             #   AND it is not a seed store (has to be a pit)
             # as per the rules, bank the stone and the adj stones
-            current_pit = self.hoverables[side][n]
-            go_to = current_pit.getPos()+Vec3(0, 0, 5)
-            
-            adj_side, adj_n = self.adj_pit(side, n)
-            adj_pit = self.hoverables[adj_side][adj_n]
-            adj_go_to = adj_pit.getPos()+Vec3(0, 0, 5)
+            currentPit = self.hoverables[side][n]
+            goTo = currentPit.getPos()+Vec3(0, 0, 5)
+
+            adjSide, adjN = self._adjPit(side, n)
+            adjPit = self.hoverables[adjSide][adjN]
+            adjGoTo = adjPit.getPos()+Vec3(0, 0, 5)
 
             # hover over the respective pits
-            self.move_stones(self.stones[side][n], go_to)
-            self.move_stones(self.stones[adj_side][adj_n], adj_go_to)
+            self._moveStones(self.stones[side][n], goTo)
+            self._moveStones(self.stones[adjSide][adjN], adjGoTo)
 
-            seed_store = self.hoverables[self._turn][6]
-            go_to = seed_store.getPos()+Vec3(0, 0, 5)
-            self.release_all_stones()
+            seedStore = self.hoverables[self._turn][6]
+            goTo = seedStore.getPos()+Vec3(0, 0, 5)
+            self._releaseAllStones()
 
             # hover over the seed store
-            self.move_stones(self.stones[side][n], go_to)
-            self.move_stones(self.stones[adj_side][adj_n], go_to)
+            self._moveStones(self.stones[side][n], goTo)
+            self._moveStones(self.stones[adjSide][adjN], goTo)
 
             # because the stone could potentially move from one side to the other
             # wait for the stones to arrive at the seed store
-            self.wait_for_stones(self.stones[adj_side][adj_n], go_to)
-            self.wait_for_stones(self.stones[side][n], go_to)
+            self._waitForStones(self.stones[adjSide][adjN], goTo)
+            self._waitForStones(self.stones[side][n], goTo)
 
-            self.release_all_stones()
-            for stone in itertools.chain(self.stones[adj_side][adj_n], self.stones[side][n]):
+            self._releaseAllStones()
+            for stone in itertools.chain(self.stones[adjSide][adjN], self.stones[side][n]):
                 # pop removes last stone in array and return it
                 # dropped_stone = self.stones[adj_side][adj_n].pop()
                 cn = stone.getParent().find('cnode').node()  # collision node
                 # set the collide masks to the collide mask of the new pit
-                cn.setFromCollideMask(BitMasks[self._turn][6])
-                cn.setIntoCollideMask(BitMasks[self._turn][6])
+                cn.setFromCollideMask(BITMASKS[self._turn][6])
+                cn.setIntoCollideMask(BITMASKS[self._turn][6])
                 self.stones[self._turn][6].append(stone)  # add to seed store
-                
+
                 # stop stones from moving
                 # in case it has any glitchy velocity
-                self.set_stationary(stone)
-            self.stones[adj_side][adj_n].clear()
+                self._setStationary(stone)
+            self.stones[adjSide][adjN].clear()
             self.stones[side][n].clear()
         elif len(self.stones[side][n]) > 1 and n != 6:
             # the last stone landed on:
             #   has at least one stone previously (so more than one stone now)
             #   AND it is not a seed store (has to be a pit)
             # as per the rules, continue going around
-            sleep(1.5) # some time for the stones to drop into the pit
-            return self.clicked_pit(side, n)
+            sleep(1.5)  # some time for the stones to drop into the pit
+            return self.clickedPit(side, n)
 
         # if there are no more stones on one side of the board...
-        if self.sum_stones(0) == 0 or self.sum_stones(1) == 0:
+        if self._sumStones(0) == 0 or self._sumStones(1) == 0:
             # there are no more stones on one side of the board
             # this means game is finished
             self.gameComplete = True
@@ -351,80 +399,154 @@ class main():
             self._turn = 0
 
     @property
-    def turn(self):
+    def turn(self) -> int:
         """Return the current turn.
 
         This function has a property decorator so it can be accessed like a variable/property
         This means self._turn is not exposed and is less likely to be externally edited
+
+        Args:
+            None
+        Returns:
+            The current turn (player 0 or 1)
         """
         return self._turn
 
-    def is_game_complete(self):
-        """Return if the game is complete."""
+    def isGameComplete(self) -> bool:
+        """Return if the game is complete.
+
+        Args:
+            None
+        Returns:
+            If the game is complete (bool)
+        """
         return self.gameComplete
 
-    def _instructions_from_file(self):
-        rules_txt = open(self.congklak_assets/"rules.txt", mode='r')
+    @property
+    def instructions(self) -> str:
+        """Return the instructions.
+
+        The instructions are saved at class init and is should be retrieved here
+
+        Args:
+            None
+        Returns:
+            The game instructions (str)
+        """
+        return self._str_instructions
+
+    @property
+    def winner(self) -> Union[int, str]:
+        """Return the winner.
+
+        This function has a property decorator so it can be accessed like a variable/property
+        This means self._winner is not exposed and is less likely to be externally edited
+
+        Args:
+            None
+        Returns:
+            The winner (player 0 or 1 or tie)
+        """
+        return self._winner
+
+    # Code used by the this class only
+    # single leading underscore means weak 'internal use' (PEP)
+
+    def _instructionsFromFile(self) -> str:
+        """Read the instructions file and return its contents.
+
+        This function is called at class init
+
+        Args:
+            None
+        Returns:
+            The game instructions (str)
+        """
+        rules_txt = open(self.CONGKLAK_ASSETS/"rules.txt", mode='r')
         instructions = ""
         with rules_txt as file:
             instructions = file.read()
 
         return instructions
 
-    @property
-    def instructions(self):
-        return self._str_instructions
+    def _alignPosition(self, task: str, stone: NodePath, goTo: Vec3):
+        """Gradually move stone to position.
 
-    @property
-    def winner(self):
-        """Return the winner.
+        Moves stone to position, this is blocking so run the background with Task
 
-        This function has a property decorator so it can be accessed like a variable/property
-        This means self._winner is not exposed and is less likely to be externally edited
+        Args:
+            task (str): The name of the task passed through
+            stone (NodePath): The stone represented by Panda3D as a node path
+            goTo (Vec3): A Panda3D class containing x, y, z coords to move to
+        Returns:
+            Task.cont (int): A constant used internally by Panda3D
+                this is to show the function is completed
+                (see Panda3D documentation for more)
         """
-        return self._winner
-
-    ''' code used by the this class only '''
-    def align_position(self, task, stone, go_to: Vec3):
-        """Gradually move stone to position."""
-        an=stone.getParent().node()  # actor node
+        an = stone.getParent().node()  # actor node
         # physics object, look at panda3d docs for more
-        phy_obj = an.getPhysicsObject()
+        phyObj = an.getPhysicsObject()
         thruster = stone.get_parent()  # this should be a node path
 
-        max_speed = 10  # the max speed possible when moving the stone
-        move_vec = (go_to-thruster.get_pos())  # direction*size from current stone position to go_to
-        move_dir = move_vec.normalized()  # direction
-        move_dist = move_vec.length()  # size
-        ratio = (2/(1+pow(2.7, -move_dist))-1)  # sigmoid function, to calculate the speed of the stone
-        phy_obj.setVelocity(move_dir*max_speed*ratio)
+        maxSpeed = 10  # the max speed possible when moving the stone
+        moveVec = (goTo-thruster.get_pos())  # direction*size from current stone position to go_to
+        moveDir = moveVec.normalized()  # direction
+        moveDist = moveVec.length()  # size
+        ratio = (2/(1+pow(2.7, -moveDist))-1)  # sigmoid function, to calculate the speed of the stone
+        phyObj.setVelocity(moveDir*maxSpeed*ratio)
         return Task.cont  # task finished (see panda3d task docs)
 
-    def wait_for_stones(self, stones, pos: Vec3):
-        '''Wait for stones to move to the pos
-        '''
-        atPos = False # are all stones are at pos
+    def _waitForStones(self, stones: list, pos: Vec3) -> bool:
+        """Wait for stones to move to the position.
+
+        Args:
+            stones (list): The list of clicked stones to wait for
+            pos (Vec3): A Panda3D class containing x, y, z coords to reach
+        Returns:
+            atPos (bool): If the stones have reached the position
+        """
+        atPos = False  # are all stones are at pos
         startTime = time()
-        while not atPos or time()-startTime >= self.stones_timeout:
+        while not atPos or time()-startTime >= self.STONES_TIMEOUT:
             sleep(0.1)
             atPos = True
             for stone in stones:
                 thruster = stone.get_parent()  # this should be a node path
                 if (thruster.getPos()-pos).length() >= 0.5:
-                    atPos = False # not at position!
+                    atPos = False  # not at position!
         return atPos
-    def move_stones(self, clicked_stones, go_to: Vec3):
-        for stone in clicked_stones:
+
+    def _moveStones(self, clickedStones: list, goTo: Vec3) -> None:
+        """Moves clicked stones to position.
+
+        Stones are move to go_to in the background, so it is non-blocking
+
+        Args:
+            clickedStones (list): The list of clicked stones to move
+            goTo (Vec3): A Panda3D class containing x, y, z coords to move to
+        Returns:
+            None
+        """
+        for stone in clickedStones:
             # hover above the current pit
-            self._app.taskMgr.add(
-                self.align_position, "moveTask",
-                extraArgs=["moveTask", stone, go_to]
+            self._APP.taskMgr.add(
+                self._alignPosition, "moveTask",
+                extraArgs=["moveTask", stone, goTo]
             )
 
-    def release_all_stones(self):
-        self._app.taskMgr.removeTasksMatching("moveTask")
+    def _releaseAllStones(self) -> None:
+        """Release all the stones.
 
-    def next_pit(self, side, n):
+        Stones will no longer be moved by move_stones in the background
+
+        Args:
+            None
+        Returns:
+            None
+        """
+        self._APP.taskMgr.removeTasksMatching("moveTask")
+
+    def _nextPit(self, side: int, n: int) -> tuple:
         """Return the next pit to the right.
 
         A function to make moving the stones easier.
@@ -432,7 +554,6 @@ class main():
         Args:
             side (int): The side of the pit
             n (int): the nth from the left
-
         Returns:
             The side and nth from the left of the next pit
         """
@@ -445,18 +566,37 @@ class main():
                 side = 0
         return side, n
 
-    def adj_pit(self, side, n):
-        """Return the adjacent pit"""
+    def _adjPit(self, side: int, n: int) -> tuple:
+        """Return the adjacent pit.
+
+        Args:
+            side (int): The side of the pit
+            n (int): the nth from the left
+        Returns:
+            The adjacent pit (int, int)
+        """
         return -side+1, 5-n
 
-    def sum_stones(self, plr):
-        """Return the total stones on the given side."""
+    def _sumStones(self, plr: int) -> int:
+        """Return the total stones on the given side.
+
+        Args:
+            plr (int): Sum for player 0 or 1
+        Returns:
+            The total stone of the given side
+        """
         # sum stones for player 1 or 0
         return sum(len(self.stones[plr][n]) for n in range(6))
 
-    def set_stationary(self, stone):
-        """Set the stone stationary (no velocity)."""
-        an=stone.getParent().node()
-        phy_obj = an.getPhysicsObject()
+    def _setStationary(self, stone: NodePath) -> None:
+        """Set the stone stationary (no velocity).
 
-        phy_obj.setVelocity(Vec3(0, 0, 0))
+        Args:
+            stone (NodePath): The stone represented by Panda3D as a node path
+        Returns:
+            None
+        """
+        an = stone.getParent().node()
+        phyObj = an.getPhysicsObject()
+
+        phyObj.setVelocity(Vec3(0, 0, 0))
