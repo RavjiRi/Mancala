@@ -1,3 +1,5 @@
+"""Script to run mancala"""
+
 from time import sleep
 from random import randint
 from queue import Queue
@@ -8,6 +10,9 @@ from warnings import warn
 from pathlib import Path
 import importlib.util
 from os import _exit
+
+# PEP: in order to preserve continuity, use camel case variable names
+# this is because Panda3D is built on C so it uses camel case.
 
 # in case of local installation of Panda3D
 working_directory = Path(__file__).parent.resolve()
@@ -24,7 +29,9 @@ except ImportError:
     raise ImportError("Please import the panda3d library to run this program using pip or https://docs.panda3d.org/1.10/python/introduction/index")
 
 useTkinter = False
+
 try:
+    #raise ImportError
     import Pmw # Python mega widgets
 except ImportError:
     warn('''The Pmw library is recommended for a better experience
@@ -37,6 +44,9 @@ else:
     # tkinter is allowed to load (can conflict with panda3d without Pmw)
     # so tell panda3d that tkinter can load with want-tk true
     loadPrcFileData("", "want-tk true")
+
+    # unlock FPS
+    loadPrcFileData("", "sync-video false")
 
     # line 3330: https://github.com/panda3d/panda3d/blob/master/direct/src/showbase/ShowBase.py
     # allow tkinter to handle main loop for better response from MacOS
@@ -79,16 +89,17 @@ class Mancala(ShowBase):
         self.roboto = self.loader.loadFont("fonts/Roboto/Roboto-Regular.ttf")
         self.roboto_bold = self.loader.loadFont("fonts/Roboto/Roboto-Bold.ttf")
 
-        from gamemodes.congklak import main
-        self.controller = main(self) # game controller
+        self.module = self.loadGamemode(working_directory/'gamemodes/classic.py')
+        self.controller = self.module.main(self) # game controller
         self.controller.load() # load board from external file
         
-        self.enableGravity()
+        self.startGravity()
         self.startMouse()
 
         self.turnText = DirectLabel(text='Your turn',
                            pos=(0, 0, 0.8), text_scale = (0.15, 0.15), frameColor=(0, 0, 0, 0),
                            textMayChange=True, parent=aspect2d, text_font=self.roboto)
+
         self.turnText.hide()
 
         # create a new daemon thread (daemon threads close with main thread)
@@ -111,6 +122,13 @@ class Mancala(ShowBase):
                          frameSize=(-2.3, 2.3, -1, 1),
                          pos=(0, 0, -0.6),
                          text_scale=(0.6, 0.6))
+        self.mm_button = DirectButton(text='MAIN MENU',
+                         scale=.05,
+                         command=self.reset,
+                         frameSize=(-5, 5, -2.5, 2.5),#frameSize=(-2, 2, -1, 1),
+                         pos=(0, 0, -0.3),
+                         text_scale=(1.5, 1.5))#text_scale=(0.6, 0.6))
+        self.mm_button.hide()
 
     def clearScene(self):
         """Clears the scene
@@ -179,6 +197,31 @@ class Mancala(ShowBase):
         self.mouseq = Queue()
         # run onMouseClick when mouse is clicked
         self.accept('mouse1', self.onMouseClick)
+
+    def reset(self):
+        """Reset the game.
+
+        Reload the board, set back to main menu
+
+        Args:
+            None
+        Returns:
+            None
+        """
+        self.clearScene()
+
+        self.disableGravity()
+
+        self.controller = self.module.main(self) # game controller
+
+        self.controller.load() # load board from external file
+
+        self.st_button.show()
+        self.gm_button.show()
+        self.ins_button.show()
+        self.turnText.hide()
+        self.mm_button.hide()
+
     def OpenInstructions(self):
         """Open the instructions
 
@@ -191,6 +234,7 @@ class Mancala(ShowBase):
         Returns:
             None
         """
+        
         tpBold = TextProperties()
         tpBold.setFont(self.roboto_bold)
         tpMgr = TextPropertiesManager.getGlobalPtr()
@@ -204,17 +248,12 @@ class Mancala(ShowBase):
         # create an inital height for the canvas
         canvas_height = 5
 
-        self.ins_frame = DirectScrolledFrame(pos=(0, -1, 0.65), frameColor=(0.5, 0.5, 0.5, 0.9),
+        self.ins_frame = DirectScrolledFrame(pos=(0, -1, 0.65), frameColor=(0.5, 0.5, 0.5, 1),
                          canvasSize = (-1/2, 1/2, -.1, canvas_height), frameSize=(-0.7, 0.7, -1.5, 0.1))
         self.ins_label = DirectLabel(text=ins_text,
                                   parent = self.ins_frame.getCanvas(), frameColor=(0, 0, 0, 0),
                                   pos=(0, 0, canvas_height-0.1), text_font=self.roboto,
                                   text_wordwrap=12, text_scale=0.1, text_align=TextNode.ACenter)
-        self.title = DirectLabel(text="\1bold\1INSTRUCTIONS",
-                                  frameColor=(0.5, 0.5, 0.5, 1), frameSize=(-0.7, 0.7, -0.1, 0.1),
-                                  pos=(0, -1, 0.85), text_font=self.roboto, borderWidth=(1, 1),
-                                  text_wordwrap=12, text_scale=0.1, text_align=TextNode.ACenter)
-
         
         # Panda3D as far as I am aware of doesn't have a good system
         # for fixing text within a specific height
@@ -246,7 +285,26 @@ class Mancala(ShowBase):
         """
         self.ins_frame.destroy()
         self.exit_ins.destroy()
-        
+
+    def loadGamemode(self, path):
+        """Load gamemode as module
+
+        The selected gamemode is imported using importlib
+
+        Args:
+            path (str): system path to file
+        Returns:
+            module
+        """
+
+        # import file directly
+        # https://docs.python.org/3/library/importlib.html#importing-a-source-file-directly
+        spec = importlib.util.spec_from_file_location("gamemode", path)
+        module = importlib.util.module_from_spec(spec)
+        sys.modules["gamemode"] = module # attach to sys.modules
+        spec.loader.exec_module(module)
+
+        return module
 
     def PopupWindowOpen(self):
         """Creates a popup file browser to select gamemode
@@ -276,17 +334,25 @@ class Mancala(ShowBase):
                 # the user clicked close...
                 return
 
-        # import file directly
-        # https://docs.python.org/3/library/importlib.html#importing-a-source-file-directly
-        spec = importlib.util.spec_from_file_location("gamemode", gamemode_path)
-        module = importlib.util.module_from_spec(spec)
-        sys.modules["gamemode"] = module # attach to sys.modules
-        spec.loader.exec_module(module)
-        self.controller = module.main(self) # game controller
+        self.module = self.loadGamemode(gamemode_path)
+        self.controller = self.module.main(self) # game controller
 
         self.clearScene()
         
         self.controller.load() # load board from external file
+
+    def startGravity(self):
+        """One-off function to initiate gravity on the scene
+
+        Args:
+            None
+        Returns:
+            None
+        """
+        gravityFN = ForceNode('world-forces')
+        gravityFNP = self.render.attachNewNode(gravityFN)
+        self.gravityForce = LinearVectorForce(0,0,-9.8) # gravity acceleration
+        gravityFN.addForce(self.gravityForce)
 
     def enableGravity(self):
         """Enable gravity on the scene
@@ -296,12 +362,18 @@ class Mancala(ShowBase):
         Returns:
             None
         """
-        gravityFN = ForceNode('world-forces')
-        gravityFNP = self.render.attachNewNode(gravityFN)
-        gravityForce = LinearVectorForce(0,0,-9.8) # gravity acceleration
-        gravityFN.addForce(gravityForce)
+        self.physicsMgr.addLinearForce(self.gravityForce)
 
-        self.physicsMgr.addLinearForce(gravityForce)
+    def disableGravity(self):
+        """Disable gravity on the scene
+
+        Args:
+            None
+        Returns:
+            None
+        """
+        self.physicsMgr.removeLinearForce(self.gravityForce)
+
     def window_closed(self):
         """On window closed event, destroy the window and exit program
 
@@ -336,16 +408,19 @@ class Mancala(ShowBase):
         return clickedPit
 
     def start_game(self):
+        self.enableGravity()
+
         # hide the buttons
         self.st_button.hide()
         self.gm_button.hide()
         self.ins_button.hide()
+        
 
         controller = app.controller # game controller
         choiceCeil = len(controller.clickables[1])-1 # the max number (ceiling) the rng can generate (because of the amount of clickables)
         
         
-        while not controller.is_game_complete():
+        while not controller.is_game_complete() and False:
             turn = controller.turn
             self.turnText.show()
             if turn == 0:
@@ -381,6 +456,7 @@ class Mancala(ShowBase):
             print("You tie")
             self.turnText['text'] = "Tie"
         self.turnText.show()
+        self.mm_button.show()
 
 # main guard for threading
 if __name__ == "__main__":

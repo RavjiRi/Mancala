@@ -281,7 +281,7 @@ class main():
             if side != self._turn and n == 6:
                 # about to drop in the opponents store
                 # skip per the rules
-                side, n = self.next_pit(side, n)  # get the next pit
+                side, n = self._next_pit(side, n)  # get the next pit
 
             go_to = self.hoverables[side][n].getPos()+Vec3(0, 0, 5)
 
