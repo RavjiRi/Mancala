@@ -1,9 +1,11 @@
 """
 Mancala written in Python.
 
-This program is written with the Panda3D library
+This program was written for Computer Science CSC335 at WHS.
+This program uses and is written with the Panda3D library.
+Click START to play the classic mancala!
 
-Click START to play the classic mancala
+Version: 23/5/24
 
 Author: Ritesh Ravji
 """
@@ -11,23 +13,24 @@ Author: Ritesh Ravji
 # don't check for these libraries as these are core libraries
 import sys
 import threading
-import importlib.util
-from os import _exit
+import importlib.util  # importing gamemodes
+from os import _exit  # exit the program
 from time import sleep
-from queue import Queue
+from queue import Queue  # store mouse clicks
 from pathlib import Path
-from codecs import decode
+from codecs import decode  # decode instructions from file
 from warnings import warn
 from random import randint
-from types import ModuleType
+from types import ModuleType  # module class for type hints
 
 # PEP: in order to preserve continuity, use camel case variable names
 # this is because Panda3D is built on C so it uses camel case.
 
-# in case of local installation of Panda3D
 WORKING_DIRECTORY = Path(__file__).parent.resolve()
-PANDA3D_INSTALL = WORKING_DIRECTORY/'Panda3D'  # path of panda3d install
-sys.path.append(PANDA3D_INSTALL.as_posix())
+
+# in case of local installation of Panda3D
+# PANDA3D_INSTALL = WORKING_DIRECTORY/'Panda3D'  # path of panda3d install
+# sys.path.append(PANDA3D_INSTALL.as_posix())
 
 try:
     from direct.showbase.ShowBase import ShowBase
@@ -103,7 +106,7 @@ class Mancala(ShowBase):
         # handle physics collisions by automatically pushing colliding objects
         self.pusher = PhysicsCollisionHandler()
         self.pusher.setDynamicFrictionCoef(0.5)  # add friction
-        self.pusher.setStaticFrictionCoef(0)
+        self.pusher.setStaticFrictionCoef(1)
 
         # automatically handle physics operations
         self.cTrav = CollisionTraverser('physics')

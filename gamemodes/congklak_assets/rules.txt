@@ -1,6 +1,6 @@
 \1bold\1OBJECTIVE:\2
 
-Both players try to collect the most stones in the congklak seed store as possible
+Both players try to collect the most stones in the congklak/dakon seed store as possible
 
 The game ends when at least one side of the board is empty
 The winner is the player with the most seeds in the seed store

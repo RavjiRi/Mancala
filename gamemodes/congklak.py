@@ -82,7 +82,6 @@ class ColourGenerator:
 class main():
     """Functions that are required and called by the main code."""
 
-    # __slots__ = []
     def __init__(self, app: object) -> None:
         """Setup the class variables.
 
@@ -94,6 +93,8 @@ class main():
         Returns:
             None
         """
+        # _ means weak internal use
+        # these should not be accessed from outside the class
         self._APP = app  # store app for use outside init function
         # y positions of clickables from left to right
         # not constant as it is reversed later
@@ -101,15 +102,18 @@ class main():
         # x positions of clickables
         # (player 0 side x pos is -2 and player 1 is 2)
         self._X_POS_CLICK = [-2, 2]
+        self._winner = None  # _ means it is a protected variable (PEP)
+        self._turn = 0  # player 0 goes first
+
+        # these can be accessed from outside the class
         self.stones = {}  # dictionary to store stones
         self.clickables = {}  # dictionary to store clickables
         self.hoverables = {}  # dictionary to store hoverables
-        self.STONES_PER_PIT = 1
+        self.STONES_PER_PIT = 7
         self.STONES_TIMEOUT = 5
-        self._winner = None  # _ means it is a protected variable (PEP)
-        self._turn = 0  # player 0 goes first
         # path to congklak assets folder
         self.CONGKLAK_ASSETS = Path(__file__).parent.resolve()/'congklak_assets'
+
         self._STR_INSTRUCTIONS = self._instructionsFromFile()
 
     def load(self) -> None:
@@ -433,7 +437,7 @@ class main():
         Returns:
             The game instructions (str)
         """
-        return self._str_instructions
+        return self._STR_INSTRUCTIONS
 
     @property
     def winner(self) -> Union[int, str]:

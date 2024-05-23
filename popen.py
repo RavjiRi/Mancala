@@ -1,15 +1,26 @@
-import tkinter
-import tkinter.filedialog
-import sys, os
+"""
+Popup file selector.
 
-root = tkinter.Tk()
-root.withdraw() # stop empty popup window
-root.focus_force()
-file = tkinter.filedialog.askopenfile(parent=root, initialdir=os.getcwd()+'/gamemodes',
-            title='Please select a directory', filetypes=[("Python files", ".py")])
+This file creates a popup file explorer to select .py files
+
+Author: Ritesh Ravji
+"""
+
+from os import getcwd
+from tkinter import Tk
+from sys import stdout, exit as _exit
+from tkinter.filedialog import askopenfile
+
+root = Tk()  # new window
+root.withdraw()  # stop empty popup window
+root.focus_force()  # focus tkinter window
+file = askopenfile(parent=root,
+                   initialdir=getcwd()+'/gamemodes',
+                   title='Please select a directory',
+                   filetypes=[("Python files", ".py")])
 
 root.destroy()
-sys.stdout.write(file.name)
-sys.stdout.flush()
+stdout.write(file.name)  # write to stdin
+stdout.flush()
 file.close()
-sys.exit(0)
+_exit(0)
