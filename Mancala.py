@@ -5,7 +5,7 @@ This program was written for Computer Science CSC335 at WHS.
 This program uses and is written with the Panda3D library.
 Click START to play the classic mancala!
 
-Version: 23/5/24
+Version: 27/5/24
 
 Author: Ritesh Ravji
 """
@@ -22,6 +22,8 @@ from codecs import decode  # decode instructions from file
 from warnings import warn
 from random import randint
 from types import ModuleType  # module class for type hints
+from datetime import datetime  # get time for logs
+from argparse import ArgumentParser  # cli args
 
 # PEP: in order to preserve continuity, use camel case variable names
 # this is because Panda3D is built on C so it uses camel case.
@@ -29,8 +31,24 @@ from types import ModuleType  # module class for type hints
 WORKING_DIRECTORY = Path(__file__).parent.resolve()
 
 # in case of local installation of Panda3D
-# PANDA3D_INSTALL = WORKING_DIRECTORY/'Panda3D'  # path of panda3d install
-# sys.path.append(PANDA3D_INSTALL.as_posix())
+# add command line arguments to add the install path
+# from the root directory this should look like:
+# "python3 Mancala.py --Panda3D H:\\Downloads\\Mancala\\Panda3D"
+# from the current directory this should look like:
+# "python3 Mancala.py --Panda3D Panda3D"
+PARSER = ArgumentParser()
+PARSER.add_argument("--Panda3D", default=None, type=Path,
+                    help="run Panda3D from a local installation")
+ARGS = PARSER.parse_args()
+
+if ARGS.Panda3D:
+    # command line arguments to use local installation of Panda3D
+    if not ARGS.Panda3D.exists():
+        raise FileNotFoundError("The path '{}' does not exist".format(ARGS.Panda3D))
+
+    #PANDA3D_INSTALL = WORKING_DIRECTORY/'Panda3D'  # path of panda3d install
+    PANDA3D_INSTALL = ARGS.Panda3D # path of panda3d install
+    sys.path.append(PANDA3D_INSTALL.as_posix())
 
 try:
     from direct.showbase.ShowBase import ShowBase
@@ -77,6 +95,13 @@ else:
 
 loadPrcFileData("", "load-file-type p3assimp")  # obj files can be loaded
 
+LOG_TIME = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+
+# this suppresses output when run from command line
+# also good for debugging
+# not a big problem if the log folder is missing
+# this will mean that there is some text from Panda3D at the start
+loadPrcFileData("", "notify-output logs/{}.txt".format(LOG_TIME))  # log output
 
 class Mancala(ShowBase):
     """Class that is responsible for the app and window.
