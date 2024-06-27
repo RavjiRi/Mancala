@@ -264,11 +264,11 @@ class main():
                     # show collision objects for debugging
                     # cnodePath.show()
 
-                    if layer == 0 and n%8==7:
-                        # if it is the last pit in the outer layer
-                        # reverse list so the first stones load on the right
-                        # so the path is counter clockwise
-                        self._y_pos_click.reverse()
+                if layer == 0 and n%8==7:
+                    # if it is the last pit in the outer layer
+                    # reverse list so the first stones load on the right
+                    # so the path is counter clockwise
+                    self._y_pos_click.reverse()
             # reverse list so the first stones load on the left
             #self._y_pos_click.reverse()
 
