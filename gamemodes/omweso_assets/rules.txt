@@ -1,0 +1,22 @@
+\1bold\1OBJECTIVE:\2
+
+Be the last player with a possible move
+
+The game ends when at least one player cannot make a move
+The winner is the last player with a possible move
+
+\1bold\1PARTS OF THE BOARD:\2
+
+The omweso board has 16 pits on each side of the board
+There are 8 inner and 8 outer pits
+Each pit has 4 stones
+
+\1bold\1HOW TO PLAY:\2
+
+When a pit is clicked, the stones will be dropped one by one clockwise around the board
+
+If the last stone lands...
+ - on a players inner pit with stones and the adjacent pits on the opponents side are have stones,
+   they get to pick up the stones and redistribute around the board
+ - on a pit with stones, they pick up the stones and continue dropping clockwise
+ - on an empty pit, it is the next players turn

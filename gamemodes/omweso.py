@@ -1,18 +1,20 @@
 """
-Classic mancala written in Python.
+Omweso written in Python.
 
 This file is the controller for the main mancala.py on:
-    - Creating a mancala board
-    - Moving stones
+    - Creating a omweso board
+    - Moving seeds (stones equivalent in mancala)
     - and more...
+
+Version: 27/6/24
 
 Author: Ritesh Ravji
 """
 
-# don't check for these libraries as these are core libraries
-from time import sleep
+import itertools
 from pathlib import Path
 from warnings import warn
+from time import sleep, time
 from typing import Union, Iterable
 from random import random, randint
 
@@ -45,7 +47,19 @@ BITMASKS = {
             3: BitMask32(0x8),
             4: BitMask32(0x10),
             5: BitMask32(0x20),
-            6: BitMask32(0x1000)  # bit mask for plr 0 mancala
+            6: BitMask32(0x1000),
+            7: BitMask32(0x1),
+            8: BitMask32(0x1),
+            9: BitMask32(0x1),
+            10: BitMask32(0x1),
+            11: BitMask32(0x1),
+            12: BitMask32(0x1),
+            13: BitMask32(0x1),
+            14: BitMask32(0x1),
+            15: BitMask32(0x1),
+            16: BitMask32(0x1),
+            17: BitMask32(0x1),
+            18: BitMask32(0x1)
             },
         1: {
             0: BitMask32(0x40),  # 0000 0000 0000 0000 0000 0000 0100 0000
@@ -54,7 +68,19 @@ BITMASKS = {
             3: BitMask32(0x200),
             4: BitMask32(0x400),
             5: BitMask32(0x800),
-            6: BitMask32(0x2000)  # bit mask for plr 1 mancala
+            6: BitMask32(0x2000),
+            7: BitMask32(0x1),
+            8: BitMask32(0x1),
+            9: BitMask32(0x1),
+            10: BitMask32(0x1),
+            11: BitMask32(0x1),
+            12: BitMask32(0x1),
+            13: BitMask32(0x1),
+            14: BitMask32(0x1),
+            15: BitMask32(0x1),
+            16: BitMask32(0x1),
+            17: BitMask32(0x1),
+            18: BitMask32(0x1)
             }
     }
 
@@ -99,10 +125,10 @@ class main():
         self._APP = app  # store app for use outside init function
         # y positions of clickables from left to right
         # not constant as it is reversed later
-        self._y_pos_click = [9.8, 5.8, 1.9, -1.9, -5.8, -9.8]
+        self._y_pos_click = [13.8, 9.8, 5.8, 1.9, -1.9, -5.8, -9.8, -13.8]
         # x positions of clickables
         # (player 0 side x pos is -2 and player 1 is 2)
-        self._X_POS_CLICK = [-2, 2]
+        self._X_POS_CLICK = [(-6, -2), (6, 2)]
         self._winner = None  # _ means it is a protected variable (PEP)
         self._turn = 0  # player 0 goes first
 
@@ -111,11 +137,12 @@ class main():
         self.clickables = {}  # dictionary to store clickables
         self.hoverables = {}  # dictionary to store hoverables
         self.STONES_PER_PIT = 4
-        # path to classic assets folder
-        self.CLASSIC_ASSETS = Path(__file__).parent.resolve()/'classic_assets'
-        if not self.CLASSIC_ASSETS.exists():
-            raise FileNotFoundError('''The classic_assets folder was not found...
-Make sure the classic_assets folder is present in the same directory as classic.py''')
+        self.STONES_TIMEOUT = 5
+        # path to congklak assets folder
+        self.OMWESO_ASSETS = Path(__file__).parent.resolve()/'omweso_assets'
+        if not self.OMWESO_ASSETS.exists():
+            raise FileNotFoundError('''The omweso_assets folder was not found...
+Make sure the omweso_assets folder is present in the same directory as omweso.py''')
 
         self._STR_INSTRUCTIONS = self._instructionsFromFile()
 
@@ -154,29 +181,33 @@ Make sure the classic_assets folder is present in the same directory as classic.
         APP.render.setLight(LNP)  # add light to render (the scene)
 
         # check for board assets
-        if not (self.CLASSIC_ASSETS/'mancala.obj').exists():
-            raise FileNotFoundError('''The mancala.obj file was not found...
-Make sure the file is present in the classic_assets folder''')
+        if not (self.OMWESO_ASSETS/'BaoBoardComplete.obj').exists():
+            raise FileNotFoundError('''The BaoBoardComplete.obj file was not found...
+Make sure the file is present in the omweso_assets folder''')
 
-        if not (self.CLASSIC_ASSETS/'collision_assets').exists():
+        if not (self.OMWESO_ASSETS/'collision_assets').exists():
             raise FileNotFoundError('''The collision_assets folder was not found...
-Make sure the folder is present in the classic_assets folder''')
+Make sure the folder is present in the omweso_assets folder''')
 
-        if not (self.CLASSIC_ASSETS/'mancala.mtl').exists():
-            warn('''The mancala.mtl file was not found...
-Make sure the file is present in the classic_assets folder
+        if not (self.OMWESO_ASSETS/'BaoBoardComplete.mtl').exists():
+            warn('''The BaoBoardComplete.mtl file was not found...
+Make sure the file is present in the omweso_assets folder
 The mancala board may appear grey without this file''',
                  RuntimeWarning)
 
         # setup mancala board
-        self.BOARD = APP.loader.loadModel(self.CLASSIC_ASSETS/'mancala.obj',
+        self.BOARD = APP.loader.loadModel(self.OMWESO_ASSETS/'BaoBoardComplete.obj',
                                           noCache=True)
         # rotate because I made the model wrong...
         self.BOARD.setP(self.BOARD, 90)
-        self.BOARD.setR(self.BOARD, 10)
         self.BOARD.reparentTo(APP.render)
 
         COLOUR_GENERATOR = ColourGenerator()
+
+        # check that the collision objs exist
+        if not (self.OMWESO_ASSETS/'collision_assets/BaoCollision.obj').exists():
+            raise FileNotFoundError('''The BaoCollision.obj file was not found...
+Make sure the folder is present in the collision_assets folder''')
 
         # loop through the board parts
         # two sides because of two players
@@ -185,23 +216,15 @@ The mancala board may appear grey without this file''',
             self.clickables[side] = {}
             self.hoverables[side] = {}
 
-            # check that the Player folders exist
-            if not (self.CLASSIC_ASSETS/'collision_assets/Player{}'.format(side)).exists():
-                raise FileNotFoundError('''The Player{} folder was not found...
-Make sure the folder is present in the collision_assets folder'''.format(side))
-
             # clickable obj nth from left
-            for n in range(6):
-                # check that the collision objs exist
-                if not (self.CLASSIC_ASSETS/'collision_assets/Player{}/{}.obj'.format(side, n)).exists():
-                    raise FileNotFoundError('''The {}.obj file was not found...
-Make sure the folder is present in the Player{} folder'''.format(n, side))
-
+            for n in range(8*2):
+                layer = n//8
                 # create board collisions for each pit
-                pit = APP.loader.loadModel(
-                    self.CLASSIC_ASSETS/'collision_assets/Player{}/{}.obj'.format(side, n),
-                    noCache=True)
+                pit = APP.loader.loadModel(self.OMWESO_ASSETS/'collision_assets/BaoCollision.obj', noCache=True)
                 pit.setP(pit, 90)
+                x_pos = self._X_POS_CLICK[side][layer]  # x pos of the pit
+                y_pos = self._y_pos_click[n%8]  # y pos of the pit
+                pit.setPos(x_pos, y_pos, 1)
                 pit.reparentTo(APP.render)
                 pit.hide()  # make sure it is not visible
                 for model in pit.find_all_matches("**/+GeomNode"):
@@ -212,8 +235,7 @@ Make sure the folder is present in the Player{} folder'''.format(n, side))
                 clickable = APP.loader.loadModel('models/misc/sphere')
                 self.clickables[side][n] = clickable
                 self.hoverables[side][n] = clickable  # all clickables can be hovered over
-                x_pos = self._X_POS_CLICK[side]  # x pos of the pit
-                y_pos = self._y_pos_click[n]  # y pos of the pit
+
                 clickable.setPos(x_pos, y_pos, 1)
                 clickable.setScale(1.5, 1.5, 1.5)
                 clickable.reparentTo(APP.render)
@@ -268,36 +290,15 @@ Make sure the folder is present in the Player{} folder'''.format(n, side))
                     APP.cTrav.addCollider(cnode_path, APP.pusher)  # add to traverser which handles physics
                     # show collision objects for debugging
                     # cnodePath.show()
-            if not (self.CLASSIC_ASSETS/'collision_assets/Player{}/Mancala.obj'.format(side)).exists():
-                raise FileNotFoundError('''The Mancala.obj file was not found...
-Make sure the folder is present in the Player{} folder'''.format(side))
-            # board collisions for the stone stores
-            # this is where the stones are banked
-            segment = APP.loader.loadModel(self.CLASSIC_ASSETS/"collision_assets/Player{}/Mancala.obj".format(side), noCache=True)
-            segment.setP(segment, 90)
-            segment.reparentTo(APP.render)
-            segment.hide()  # should not be visible
-            for model in segment.find_all_matches("**/+GeomNode"):
-                # add a collide mask so stones in the store don't fall through
-                # the stone store is the 6th from the left
-                model.setCollideMask(BITMASKS[side][6])
-            self.stones[side][6] = []  # create the array to store stones in
-            # create hoverable point
-            hoverable = APP.loader.loadModel('models/misc/sphere')
-            self.hoverables[side][6] = hoverable
-            if side == 0:
-                y_pos = -13.9
-            else:
-                y_pos = 13.9
-            hoverable.setPos(0, y_pos, 1)
-            hoverable.setScale(1.5, 1.5, 1.5)
-            hoverable.hide()
-            hoverable.setTag('hover', "True")
-            hoverable.setTag('side', str(side))
-            hoverable.setTag('n', str(6))
-            hoverable.reparentTo(APP.render)
-            # reverse list so the first stones load on the left
-            self._y_pos_click.reverse()
+
+                if layer == 0 and n%8==7:
+                    # if it is the last pit in the outer layer
+                    # reverse list so the first stones load on the right
+                    # so the path is counter clockwise
+                    print(self._y_pos_click)
+                    self._y_pos_click.reverse()
+                    print(self._y_pos_click)
+                    print(layer, n)
 
         # backup collsion 'floor' in case the stones fall through the model
         plane = CollisionPlane(Plane(Vec3(0, 0, 1), Point3(0, 0, -0.5)))
@@ -307,7 +308,7 @@ Make sure the folder is present in the Player{} folder'''.format(side))
 
         self.gameComplete = False
 
-    def clickedPit(self, clickedSide: int, clickedN: int) -> None:
+    def clickedPit(self, clickedSide: int, clickedN: int, **kwargs) -> None:
         """Move the stones for the given clicked pit.
 
         This function is called by the main Mancala.py file
@@ -316,16 +317,23 @@ Make sure the folder is present in the Player{} folder'''.format(side))
         Args:
             clickedSide (int): The side that is clicked
             clickedN (int): The pit nth from the left that is clicked
+            **kwargs: Optional keyword args, the original clicked side and clicked n
+                oClickedSide (int): the original side that is clicked
+                oClickedN (int): the original nth pit that is clicked
         Returns:
             None
         """
         app = self._APP  # save space by dropping self
         clickedStones = self.stones[clickedSide][clickedN]
 
+        # save for when seeds are captured
+        oClickedSide = kwargs.get('oClickedSide', clickedSide)
+        oClickedN = kwargs.get('oClickedN', clickedN)
+
         side = clickedSide
         n = clickedN
         # repeat for the # of stones in the clicked pit
-        for i in range(0, len(clickedStones)):
+        for i in range(len(clickedStones)):
             currentPit = self.hoverables[side][n]
             goTo = currentPit.getPos()+Vec3(0, 0, 5)
 
@@ -362,6 +370,70 @@ Make sure the folder is present in the Player{} folder'''.format(side))
             self._setStationary(droppedStone)
         # no more stones in the clicked pit
 
+        (adjSide1, adjN1), (adjSide2, adjN2) = self._adjPits(side, n)
+
+        if (side == self._turn and len(self.stones[side][n]) >= 1 and n//8 == 1
+            and len(self.stones[adjSide1][adjN1]) and len(self.stones[adjSide2][adjN2])):
+            # the last stone landed on:
+            #   their own side
+            #   AND it is the inner pit (n//8) is 1
+            #   AND adj stones are not empty
+            #   AND was not previously empty/is was occupied (now it has more than one stone)
+            # as per the rules, pick up adj stones the stone and redistribute
+            currentPit = self.hoverables[side][n]
+            goTo = currentPit.getPos()+Vec3(0, 0, 5)
+
+            adjPit1 = self.hoverables[adjSide1][adjN1]
+            adjPit2 = self.hoverables[adjSide2][adjN2]
+            adj1GoTo = adjPit1.getPos()+Vec3(0, 0, 5)
+            adj2GoTo = adjPit2.getPos()+Vec3(0, 0, 5)
+
+            # hover over the respective pits
+            self._moveStones(self.stones[side][n], goTo)
+            self._moveStones(self.stones[adjSide1][adjN1], adj1GoTo)
+            self._moveStones(self.stones[adjSide2][adjN2], adj2GoTo)
+
+            sleep(0.5)
+
+            # hover over the starting pit as per the rules
+            hoverPit = self.hoverables[oClickedSide][oClickedN]
+            goTo = hoverPit.getPos()+Vec3(0, 0, 5)
+            self._releaseAllStones()
+
+            # hover over the starting pit
+            self._moveStones(self.stones[side][n], goTo)
+            self._moveStones(self.stones[adjSide1][adjN1], goTo)
+            self._moveStones(self.stones[adjSide2][adjN2], goTo)
+
+            # because the stone could potentially move from one side to the other
+            # wait for the stones to arrive at the seed store
+            self._waitForStones(self.stones[adjSide1][adjN1], goTo)
+            self._waitForStones(self.stones[adjSide2][adjN2], goTo)
+            self._waitForStones(self.stones[side][n], goTo)
+
+            self._releaseAllStones()
+            for stone in itertools.chain(self.stones[adjSide1][adjN1], self.stones[adjSide2][adjN2], self.stones[side][n]):
+                # pop removes last stone in array and return it
+                # dropped_stone = self.stones[adj_side][adj_n].pop()
+                cn = stone.getParent().find('cnode').node()  # collision node
+                # set the collide masks to the collide mask of the new pit
+                cn.setFromCollideMask(BITMASKS[oClickedSide][oClickedN])
+                cn.setIntoCollideMask(BITMASKS[oClickedSide][oClickedN])
+                self.stones[oClickedSide][oClickedN].append(stone)  # add to seed store
+
+                # stop stones from moving
+                # in case it has any glitchy velocity
+                self._setStationary(stone)
+            self.stones[adjSide1][adjN1].clear()
+            self.stones[adjSide2][adjN2].clear()
+            self.stones[side][n].clear()
+        elif len(self.stones[side][n]) > 1:
+            # the last stone landed on:
+            #   has at least one stone previously (so more than one stone now)
+            # as per the rules, continue going around
+            sleep(1.5)  # some time for the stones to drop into the pit
+            return self.clickedPit(side, n, oClickedSide = oClickedSide, oClickedN = oClickedN)
+
         # if there are no more stones on one side of the board...
         if self._sumStones(0) == 0 or self._sumStones(1) == 0:
             # there are no more stones on one side of the board
@@ -376,10 +448,7 @@ Make sure the folder is present in the Player{} folder'''.format(side))
             else:
                 self._winner = "TIE"
 
-        if side == self._turn and n == 6:
-            # last stone landed in the stone store so go again
-            pass
-        elif self._turn == 0:
+        if self._turn == 0:
             self._turn = 1
         else:
             self._turn = 0
@@ -448,19 +517,19 @@ Make sure the folder is present in the Player{} folder'''.format(side))
         Returns:
             The game instructions (str)
         """
-        if not (self.CLASSIC_ASSETS/'rules.txt').exists():
+        if not (self.OMWESO_ASSETS/'rules.txt').exists():
             warn('''The game rules were not found...
-Make sure the rules.txt file is present in the classic_assets folder''',
+Make sure the rules.txt file is present in the omweso_assets folder''',
                  RuntimeWarning)
             return ''
-        rules_txt = open(self.CLASSIC_ASSETS/"rules.txt", mode='r')
+        rules_txt = open(self.OMWESO_ASSETS/"rules.txt", mode='r')
         instructions = ""
         with rules_txt as file:
             instructions = file.read()
 
         return instructions
 
-    def _alignPosition(self, task: str, stone: NodePath, goTo: Vec3) -> int:
+    def _alignPosition(self, task: str, stone: NodePath, goTo: Vec3):
         """Gradually move stone to position.
 
         Moves stone to position, this is blocking so run the background with Task
@@ -487,8 +556,28 @@ Make sure the rules.txt file is present in the classic_assets folder''',
         phyObj.setVelocity(moveDir*maxSpeed*ratio)
         return Task.cont  # task finished (see panda3d task docs)
 
+    def _waitForStones(self, stones: list, pos: Vec3) -> bool:
+        """Wait for stones to move to the position.
+
+        Args:
+            stones (list): The list of clicked stones to wait for
+            pos (Vec3): A Panda3D class containing x, y, z coords to reach
+        Returns:
+            atPos (bool): If the stones have reached the position
+        """
+        atPos = False  # are all stones are at pos
+        startTime = time()
+        while not atPos and time()-startTime <= self.STONES_TIMEOUT:
+            sleep(0.1)
+            atPos = True
+            for stone in stones:
+                thruster = stone.get_parent()  # this should be a node path
+                if (thruster.getPos()-pos).length() >= 0.5:
+                    atPos = False  # not at position!
+        return atPos
+
     def _moveStones(self, clickedStones: list, goTo: Vec3) -> None:
-        """Move clicked stones to position.
+        """Moves clicked stones to position.
 
         Stones are move to go_to in the background, so it is non-blocking
 
@@ -517,7 +606,7 @@ Make sure the rules.txt file is present in the classic_assets folder''',
         """
         self._APP.taskMgr.removeTasksMatching("moveTask")
 
-    def _nextPit(self, side: int, n: int) -> tuple:  # -> tuple[int, int]:
+    def _nextPit(self, side: int, n: int) -> tuple:
         """Return the next pit to the right.
 
         A function to make moving the stones easier.
@@ -529,13 +618,20 @@ Make sure the rules.txt file is present in the classic_assets folder''',
             The side and nth from the left of the next pit
         """
         n += 1
-        if n >= 7:
+        if n >= 16:
             n = 0
-            if side == 0:
-                side = 1
-            else:
-                side = 0
         return side, n
+
+    def _adjPits(self, side: int, n: int) -> tuple:
+        """Return the adjacent pits on the opponents side.
+
+        Args:
+            side (int): The side of the pit
+            n (int): the nth from the left
+        Returns:
+            The adjacent pits ((side: int, n: int), (side: int, n: int))
+        """
+        return (-side+1, n-8), (-side+1, -n+23)
 
     def _sumStones(self, plr: int) -> int:
         """Return the total stones on the given side.

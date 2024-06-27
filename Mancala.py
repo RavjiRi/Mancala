@@ -157,11 +157,11 @@ class Mancala(ShowBase):
         # create a new daemon thread (daemon threads close with main thread)
         # this is because a while loop starts and this is blocking
         # the app window will freeze if this happens
-        t = threading.Thread(target=self.startGame, args=(), daemon=True)
+        self.startGameThread = threading.Thread(target=self.startGame, args=(), daemon=True)
 
         # start the thread when clicked
         self.ST_BUTTON = DirectButton(text="START",
-                                      scale=.05, command=t.start,
+                                      scale=.05, command=self.startGameThread.start,
                                       frameSize=(-2, 2, -1, 1))
         self.GM_BUTTON = DirectButton(text="GAMEMODE",
                                       scale=.05, command=self.popupWindowOpen,
@@ -263,6 +263,11 @@ class Mancala(ShowBase):
 
         self.controller.load()  # load board from external file
 
+        # create a new Thread otherwise an error occurs
+        # "RuntimeError: threads can only be started once"
+        self.startGameThread = threading.Thread(target=self.startGame, args=(), daemon=True)
+        self.ST_BUTTON["command"] = self.startGameThread.start
+
         self.ST_BUTTON.show()
         self.GM_BUTTON.show()
         self.INS_BUTTON.show()
@@ -344,6 +349,10 @@ class Mancala(ShowBase):
         Returns:
             module (ModuleType)
         """
+        # check the path to gamemode folder exists
+        if not Path(path).exists():
+            raise FileNotFoundError('''The gamemode folder was not found...
+Make sure the gamemode folder is present in the same directory as this script''')
         # import file directly
         # https://docs.python.org/3/library/importlib.html#importing-a-source-file-directly
         spec = importlib.util.spec_from_file_location("gamemode", path)

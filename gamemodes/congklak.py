@@ -11,6 +11,7 @@ Author: Ritesh Ravji
 
 import itertools
 from pathlib import Path
+from warnings import warn
 from time import sleep, time
 from typing import Union, Iterable
 from random import random, randint
@@ -113,6 +114,9 @@ class main():
         self.STONES_TIMEOUT = 5
         # path to congklak assets folder
         self.CONGKLAK_ASSETS = Path(__file__).parent.resolve()/'congklak_assets'
+        if not self.CONGKLAK_ASSETS.exists():
+            raise FileNotFoundError('''The congklak_assets folder was not found...
+Make sure the congklak_assets folder is present in the same directory as congklak.py''')
 
         self._STR_INSTRUCTIONS = self._instructionsFromFile()
 
@@ -150,6 +154,21 @@ class main():
         LNP.setHpr(0, -90, 0)  # heading, yaw, pitch (the angle of light)
         APP.render.setLight(LNP)  # add light to render (the scene)
 
+        # check for board assets
+        if not (self.CONGKLAK_ASSETS/'mancala.obj').exists():
+            raise FileNotFoundError('''The mancala.obj file was not found...
+Make sure the file is present in the congklak_assets folder''')
+
+        if not (self.CONGKLAK_ASSETS/'collision_assets').exists():
+            raise FileNotFoundError('''The collision_assets folder was not found...
+Make sure the folder is present in the congklak_assets folder''')
+
+        if not (self.CONGKLAK_ASSETS/'mancala.mtl').exists():
+            warn('''The mancala.mtl file was not found...
+Make sure the file is present in the congklak_assets folder
+The mancala board may appear grey without this file''',
+                 RuntimeWarning)
+
         # setup mancala board
         self.BOARD = APP.loader.loadModel(self.CONGKLAK_ASSETS/'mancala.obj',
                                           noCache=True)
@@ -166,8 +185,19 @@ class main():
             self.stones[side] = {}
             self.clickables[side] = {}
             self.hoverables[side] = {}
+
+            # check that the Player folders exist
+            if not (self.CONGKLAK_ASSETS/'collision_assets/Player{}'.format(side)).exists():
+                raise FileNotFoundError('''The Player{} folder was not found...
+Make sure the folder is present in the collision_assets folder'''.format(side))
+
             # clickable obj nth from left
             for n in range(6):
+                # check that the collision objs exist
+                if not (self.CONGKLAK_ASSETS/'collision_assets/Player{}/{}.obj'.format(side, n)).exists():
+                    raise FileNotFoundError('''The {}.obj file was not found...
+Make sure the folder is present in the Player{} folder'''.format(n, side))
+
                 # create board collisions for each pit
                 pit = APP.loader.loadModel(self.CONGKLAK_ASSETS/'collision_assets/Player{}/{}.obj'.format(side, n), noCache=True)
                 pit.setP(pit, 90)
@@ -217,7 +247,8 @@ class main():
                     # set stone position
                     # when we move the stone we must move the node path Panp
                     # this is because Panp is moved by the physics system
-                    panp.setPos(x+random()/4, y+random()/4, 5+count*5)  # add random() to add a randomness to the stone scattering
+                    # add random() to add a randomness to the stone scattering
+                    panp.setPos(x+random()/4, y+random()/4, 5+count*5)
 
                     # create a collision sphere which will set how the stone looks to the collision system
                     cs = CollisionSphere(stone.getBounds().getCenter(), 0.35)
@@ -236,6 +267,10 @@ class main():
                     APP.cTrav.addCollider(cnode_path, APP.pusher)  # add to traverser which handles physics
                     # show collision objects for debugging
                     # cnodePath.show()
+
+            if not (self.CONGKLAK_ASSETS/'collision_assets/Player{}/Mancala.obj'.format(side)).exists():
+                raise FileNotFoundError('''The Mancala.obj file was not found...
+Make sure the folder is present in the Player{} folder'''.format(side))
             # board collisions for the stone stores
             # this is where the stones are banked
             segment = APP.loader.loadModel(self.CONGKLAK_ASSETS/"collision_assets/Player{}/Mancala.obj".format(side), noCache=True)
@@ -466,6 +501,11 @@ class main():
         Returns:
             The game instructions (str)
         """
+        if not (self.CONGKLAK_ASSETS/'rules.txt').exists():
+            warn('''The game rules were not found...
+Make sure the rules.txt file is present in the congklak_assets folder''',
+                 RuntimeWarning)
+            return ''
         rules_txt = open(self.CONGKLAK_ASSETS/"rules.txt", mode='r')
         instructions = ""
         with rules_txt as file:
