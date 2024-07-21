@@ -102,7 +102,7 @@ LOG_TIME = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
 # not a big problem if the log folder is missing
 # this will mean that there is some text from Panda3D at the start
 loadPrcFileData("", "notify-output {}/logs/{}.txt".format(WORKING_DIRECTORY,
-  LOG_TIME))  # log output
+                LOG_TIME))  # log output
 
 class Mancala(ShowBase):
     """Class that is responsible for the app and window.
