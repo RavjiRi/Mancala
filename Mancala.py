@@ -384,7 +384,7 @@ Make sure the gamemode folder is present in the same directory as this script'''
             gamemodePath = file.name
             file.close()
         else:
-            process = Popen(['python', 'popen.py'], stdout=PIPE, stderr=PIPE)
+            process = Popen(['python', WORKING_DIRECTORY/'popen.py'], stdout=PIPE, stderr=PIPE)
             stdout, stderr = process.communicate()
             gamemodePath = stdout.decode('utf-8')
             if not gamemodePath:
