@@ -5,6 +5,12 @@ This program was written for Computer Science CSC335 at WHS.
 This program uses and is written with the Panda3D library.
 Click START to play the classic mancala!
 
+Relevant Implications addressed:
+- IP and Copyright: This does not copy any waddling games
+- Cultural: Included different versions of Mancala from around the world
+- Usability: Error handling, memorability, etc
+- Sustainability: Used well maintained libraries, Python, etc
+
 Version: 27/5/24
 
 Author: Ritesh Ravji
