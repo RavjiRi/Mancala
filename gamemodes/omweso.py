@@ -295,10 +295,7 @@ Make sure the folder is present in the collision_assets folder''')
                     # if it is the last pit in the outer layer
                     # reverse list so the first stones load on the right
                     # so the path is counter clockwise
-                    print(self._y_pos_click)
                     self._y_pos_click.reverse()
-                    print(self._y_pos_click)
-                    print(layer, n)
 
         # backup collsion 'floor' in case the stones fall through the model
         plane = CollisionPlane(Plane(Vec3(0, 0, 1), Point3(0, 0, -0.5)))
