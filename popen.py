@@ -6,16 +6,18 @@ This file creates a popup file explorer to select .py files
 Author: Ritesh Ravji
 """
 
-from os import getcwd
+from pathlib import Path
 from tkinter import Tk
 from sys import stdout, exit as _exit
 from tkinter.filedialog import askopenfile
+
+WORKING_DIRECTORY = Path(__file__).parent.resolve()
 
 root = Tk()  # new window
 root.withdraw()  # stop empty popup window
 root.focus_force()  # focus tkinter window
 file = askopenfile(parent=root,
-                   initialdir=getcwd()+'/gamemodes',
+                   initialdir=WORKING_DIRECTORY/'gamemodes',
                    title='Please select a directory',
                    filetypes=[("Python files", ".py")])
 
