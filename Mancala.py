@@ -120,7 +120,7 @@ class Mancala(ShowBase):
         """Start the app and window."""
         ShowBase.__init__(self)  # start the module (creates window)
         self.disableMouse()  # disable camera control with the mouse
-        base.setFrameRateMeter(True)  # show frame rate
+        base.setFrameRateMeter(False)  # show or hide frame rate
         self.set_background_color(1, 1, 1, 1)
         properties = WindowProperties()
         properties.setTitle('Mancala')
