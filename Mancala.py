@@ -137,7 +137,7 @@ class Mancala(ShowBase):
 
         # handle physics collisions by automatically pushing colliding objects
         self.pusher = PhysicsCollisionHandler()
-        self.pusher.setDynamicFrictionCoef(0.5)  # add friction
+        self.pusher.setDynamicFrictionCoef(1)  # add friction
         self.pusher.setStaticFrictionCoef(1)
 
         # automatically handle physics operations
