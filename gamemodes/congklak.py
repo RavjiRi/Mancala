@@ -233,7 +233,7 @@ Make sure the folder is present in the Player{} folder'''.format(n, side))
                     x, y, z = clickable.getPos()
                     stone = APP.loader.loadModel('models/misc/sphere')
                     self.stones[side][n].append(stone)
-                    stone.setScale(0.35, 0.35, 0.35)
+                    stone.setScale(0.2, 0.2, 0.2)
                     stone.setColor(next(COLOUR_GENERATOR))
 
                     # start physics logic
@@ -251,7 +251,7 @@ Make sure the folder is present in the Player{} folder'''.format(n, side))
                     panp.setPos(x+random()/4, y+random()/4, 5+count*5)
 
                     # create a collision sphere which will set how the stone looks to the collision system
-                    cs = CollisionSphere(stone.getBounds().getCenter(), 0.35)
+                    cs = CollisionSphere(stone.getBounds().getCenter(), 0.2)
                     cn = CollisionNode('cnode')
 
                     # from objects are the 'moving' objs
