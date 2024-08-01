@@ -125,7 +125,7 @@ class main():
         self._APP = app  # store app for use outside init function
         # y positions of clickables from left to right
         # not constant as it is reversed later
-        self._y_pos_click = [13.8, 9.8, 5.8, 1.9, -1.9, -5.8, -9.8, -13.8]
+        self._yPosClick = [13.8, 9.8, 5.8, 1.9, -1.9, -5.8, -9.8, -13.8]
         # x positions of clickables
         # (player 0 side x pos is -2 and player 1 is 2)
         self._X_POS_CLICK = [(-6, -2), (6, 2)]
@@ -223,7 +223,7 @@ Make sure the folder is present in the collision_assets folder''')
                 pit = APP.loader.loadModel(self.OMWESO_ASSETS/'collision_assets/BaoCollision.obj', noCache=True)
                 pit.setP(pit, 90)
                 x_pos = self._X_POS_CLICK[side][layer]  # x pos of the pit
-                y_pos = self._y_pos_click[n%8]  # y pos of the pit
+                y_pos = self._yPosClick[n%8]  # y pos of the pit
                 pit.setPos(x_pos, y_pos, 1)
                 pit.reparentTo(APP.render)
                 pit.hide()  # make sure it is not visible
@@ -295,7 +295,7 @@ Make sure the folder is present in the collision_assets folder''')
                     # if it is the last pit in the outer layer
                     # reverse list so the first stones load on the right
                     # so the path is counter clockwise
-                    self._y_pos_click.reverse()
+                    self._yPosClick.reverse()
 
         # backup collsion 'floor' in case the stones fall through the model
         plane = CollisionPlane(Plane(Vec3(0, 0, 1), Point3(0, 0, -0.5)))
