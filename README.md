@@ -19,3 +19,8 @@ Run this in any Python IDE such as IDLE or run through the command line using:
 ```bash
 python3 Mancala.py
 ```
+
+You will need the Panda3D library which can installed using pip through the command line using:
+```bash
+pip install Panda3D
+```
